@@ -215,3 +215,34 @@ sellerPeer = I.do
     NotBuy -> returnAt ()
 ```
 ---------------------------------------------
+You can run these two examples: cabal test
+
+result: 
+
+```shell
+----------------- run Book -----------------
+buyer send: haskell book
+seller recv: Title
+seller send: Price
+buyer recv: price
+buyer can buy, send Afford
+seller recv: Afford
+seller send: Date, Finish
+buyer recv: Date, Finish
+---------------- run Book1 -----------------
+buyer send: haskell book
+seller recv: Title
+seller send: Price
+buyer recv: price
+buyer send price to b2
+buyer2 recv: price
+buyer2 send half price to buyer, Finish
+buyer recv: b2 half price
+buyer can buy, send Afford
+seller recv: Afford
+seller send: Date, Finish
+buyer recv: Date, Finish
+
+```
+
+
