@@ -76,9 +76,9 @@ data CheckPriceResult :: BookSt -> Type where
 budget :: Int
 budget = 100
 
-checkPrice :: Int -> Peer Role BookSt Buyer IO CheckPriceResult S12
-checkPrice i =
-  if i < budget
+checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12
+checkPrice i hv =
+  if i < budget + hv
     then LiftM $ pure (ireturn CheckTrue)
     else LiftM $ pure (ireturn CheckFalse)
 
@@ -89,7 +89,7 @@ buyerPeer = I.do
   Recv (Price i) <- await
   yield (PriceToB2 i)
   Recv (HalfPrice hv) <- await
-  res <- checkPrice (i + hv)
+  res <- checkPrice i hv
   case res of
     CheckTrue -> I.do
       yield Afford
