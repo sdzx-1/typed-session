@@ -3,25 +3,23 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
-{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QualifiedDo #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-{-# HLINT ignore "Use lambda-case" #-}
-
 module Book where
 
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
-import Control.Exception (throwIO)
 import Control.Monad
 import Data.IFunctor (At (..), ireturn, returnAt)
 import qualified Data.IFunctor as I
@@ -31,7 +29,6 @@ import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
 import Unsafe.Coerce (unsafeCoerce)
-import Type
 
 {-
 
@@ -159,11 +156,11 @@ codecRoleBookSt = Codec{encode, decode}
         Nothing -> return $ DecodeFail (CodecFailure "expected more data")
         Just (AnyMessage msg) -> return $
           case (stok, msg) of
-            (Agency _ SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SSeller SS2, Afford{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
-            (Agency _ SSeller SS2, NotBuy{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
+            (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS2, Afford{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
+            (Agency SSeller SS2, NotBuy{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
             _ -> undefined
 
 data A = A1 | A2
@@ -195,51 +192,51 @@ checkPrice i =
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
-  yield (Title "haskell book")
   liftm $ putStrLn "buyer send: haskell book"
+  yield (Title "haskell book")
   Recv (Price i) <- await
   liftm $ putStrLn "buyer recv: price"
   res <- checkPrice i
   case res of
     CheckTrue -> I.do
-      yield Afford
       liftm $ putStrLn "buyer can buy, send Afford"
+      yield Afford
       Recv (Date d) <- await
       liftm $ putStrLn "buyer recv: Date, Finish"
       returnAt (Just d)
     CheckFalse -> I.do
-      yield NotBuy
       liftm $ putStrLn "buyer can't buy, send NotBuy, Finish"
+      yield NotBuy
       returnAt Nothing
 
 sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
 sellerPeer = I.do
   Recv (Title _name) <- await
   liftm $ putStrLn "seller recv: Title"
-  yield (Price 30)
   liftm $ putStrLn "seller send: Price"
+  yield (Price 30)
   Recv msg <- await
   case msg of
     Afford -> I.do
       liftm $ putStrLn "seller recv: Afford"
-      yield (Date 100)
       liftm $ putStrLn "seller send: Date, Finish"
+      yield (Date 100)
     NotBuy -> I.do
       liftm $ putStrLn "seller recv: NotBuy, Finish"
       returnAt ()
 
-newTMV :: s -> IO (s, TMVar a)
-newTMV s = do
-  ntmv <- newEmptyTMVarIO
-  pure (s, ntmv)
-
 runAll :: IO ()
 runAll = do
-  buyerR <- newTMV Buyer
-  selleR <- newTMV Seller
+  buyerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
 
-  let channel1 = mvarsAsChannel selleR [buyerR]
-      channel2 = mvarsAsChannel buyerR [selleR]
+  let sendFun :: forall r. Sing (r :: Role) -> AnyMessage Role BookSt -> IO ()
+      sendFun sr a = case sr of
+        SBuyer -> atomically $ putTMVar buyerTMVar a
+        SSeller -> atomically $ putTMVar sellerTMVar a
+
+  let channel1 = mvarsAsChannel sellerTMVar sendFun
+      channel2 = mvarsAsChannel buyerTMVar sendFun
 
   forkIO $ void $ do
     runPeerWithDriver (driverSimple codecRoleBookSt channel1) sellerPeer Nothing

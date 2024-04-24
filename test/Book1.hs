@@ -8,12 +8,12 @@
 {-# LANGUAGE QualifiedDo #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# HLINT ignore "Use lambda-case" #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
-
-{-# HLINT ignore "Use lambda-case" #-}
 
 module Book1 where
 
@@ -28,7 +28,6 @@ import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
 import Unsafe.Coerce (unsafeCoerce)
-import Type
 
 {-
 
@@ -121,7 +120,6 @@ instance SingI S110 where
 instance SingI S12 where
   sing = SS12
 
-
 instance SingI (S2 s) where
   sing = SS2
 
@@ -169,13 +167,13 @@ codecRoleBookSt = Codec{encode, decode}
         Nothing -> return $ DecodeFail (CodecFailure "expected more data")
         Just (AnyMessage msg) -> return $
           case (stok, msg) of
-            (Agency _ SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency _ SSeller SS2, Afford{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
-            (Agency _ SSeller SS2, NotBuy{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
-            (Agency _ SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS2, Afford{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
+            (Agency SSeller SS2, NotBuy{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
+            (Agency SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             _ -> error "np"
 
 data CheckPriceResult :: BookSt -> Type where
@@ -246,13 +244,19 @@ newTMV s = do
 
 runAll :: IO ()
 runAll = do
-  buyerR <- newTMV Buyer
-  buyer2R <- newTMV Buyer2
-  selleR <- newTMV Seller
+  buyerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
+  buyer2TMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
 
-  let chanSeller = mvarsAsChannel selleR [buyerR]
-      chanBuyer2 = mvarsAsChannel buyer2R [buyerR]
-      chanBuyer = mvarsAsChannel buyerR [selleR, buyer2R]
+  let sendFun :: forall r. Sing (r :: Role) -> AnyMessage Role BookSt -> IO ()
+      sendFun sr a = case sr of
+        SBuyer -> atomically $ putTMVar buyerTMVar a
+        SBuyer2 -> atomically $ putTMVar buyer2TMVar a
+        SSeller -> atomically $ putTMVar sellerTMVar a
+
+  let chanSeller = mvarsAsChannel sellerTMVar sendFun
+      chanBuyer2 = mvarsAsChannel buyer2TMVar sendFun
+      chanBuyer = mvarsAsChannel buyerTMVar sendFun
 
   forkIO $ void $ do
     runPeerWithDriver (driverSimple codecRoleBookSt chanSeller) sellerPeer Nothing

@@ -13,10 +13,8 @@ module TypedProtocol.Driver where
 
 import Control.Exception (throwIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.Data (Proxy (..))
 import Data.IFunctor (At (..))
 import qualified Data.IFunctor as I
-import qualified Data.Map as Map
 import Data.SR
 import GHC.Exception (Exception)
 import TypedProtocol.Codec
@@ -54,11 +52,11 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     -> m (a, dstate)
   go dstate (IReturn (At a)) = pure (a, dstate)
   go dstate (LiftM k) = k >>= go dstate
-  go dstate (Yield (msg :: Msg role' ps r recv st' '(sps, rps)) k) = do
-    sendMsg (Agency (reifyProxy (Proxy :: Proxy recv)) (sing @recv) (sing @st')) msg
+  go dstate (Yield (msg :: Msg role' ps r (recv :: role') (st' :: ps) '(sps, rps)) k) = do
+    sendMsg (Agency (sing @recv) (sing @st')) msg
     go dstate k
-  go dstate (Await (k :: (Recv role' ps r st' I.~> Peer role' ps recv m ia))) = do
-    (SomeMsg msg, dstate') <- recvMsg (Agency (reifyProxy (Proxy :: Proxy r)) (sing @r) (sing @st')) dstate
+  go dstate (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
+    (SomeMsg msg, dstate') <- recvMsg (Agency (sing @r) (sing @st')) dstate
     go dstate' (k msg)
 
 driverSimple
@@ -67,7 +65,7 @@ driverSimple
   => Codec role' ps failure m bytes
   -> Channel role' m bytes
   -> Driver role' ps (Maybe bytes) m
-driverSimple Codec{encode, decode} channel@Channel{sendMap} =
+driverSimple Codec{encode, decode} channel@Channel{sendFun} =
   Driver{sendMsg, recvMsg, startDState = Nothing}
  where
   sendMsg
@@ -75,10 +73,7 @@ driverSimple Codec{encode, decode} channel@Channel{sendMap} =
      . Agency role' ps recv from
     -> Msg role' ps send recv from '(st, st1)
     -> m ()
-  sendMsg stok@(Agency role _ _) msg =
-    case Map.lookup role sendMap of
-      Nothing -> error "Not Found Send Function!"
-      Just send -> send (encode stok msg)
+  sendMsg stok@(Agency srecv _) msg = sendFun srecv (encode stok msg)
 
   recvMsg
     :: forall (recv :: role') (from :: ps)

@@ -13,8 +13,7 @@ module TypedProtocol.Codec where
 
 import Control.Concurrent.STM
 import Control.Exception (Exception)
-import Data.Map (Map)
-import qualified Data.Map as Map
+import Data.SR
 import TypedProtocol.Core
 
 data Codec role' ps failure m bytes = Codec
@@ -57,19 +56,17 @@ data AnyMessage role' ps where
     -> AnyMessage role' ps
 
 data Channel role' m a = Channel
-  { sendMap :: Map role' (a -> m ())
+  { sendFun :: forall r. Sing (r :: role') -> a -> m ()
   , recv :: m (Maybe a)
   }
 
 mvarsAsChannel
-  :: (Ord role')
-  => (role', TMVar a)
-  -> [(role', TMVar a)]
+  :: TMVar a
+  -> (forall r. Sing (r :: role') -> (a -> IO ()))
   -> Channel role' IO a
-mvarsAsChannel (_, bufferRead) bufferWrites =
-  Channel{sendMap, recv}
+mvarsAsChannel bufferRead sendFun =
+  Channel{sendFun, recv}
  where
-  sendMap = Map.fromList $ map (\(i, tmvar) -> (i, atomically . putTMVar tmvar)) bufferWrites
   recv = atomically (Just <$> takeTMVar bufferRead)
 
 runDecoderWithChannel
