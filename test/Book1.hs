@@ -224,9 +224,8 @@ mvarsAsChannel bufferRead sendFun =
  where
   recv = atomically (Just <$> takeTMVar bufferRead)
 
-
-myTracer :: Tracer Role BookSt IO
-myTracer = print
+myTracer :: String -> Tracer Role BookSt IO
+myTracer st v = putStrLn (st <> show v)
 
 instance Show (AnyMsg Role BookSt) where
   show (AnyMsg msg) = case msg of
@@ -255,10 +254,10 @@ runAll = do
       chanBuyer = mvarsAsChannel buyerTMVar sendFun
 
   forkIO $ void $ do
-    runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanSeller) sellerPeer Nothing
+    runPeerWithDriver (driverSimple (myTracer "Seller: ") codecRoleBookSt chanSeller) sellerPeer Nothing
 
   forkIO $ void $ do
-    runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanBuyer2) buyerPeer2 Nothing
+    runPeerWithDriver (driverSimple (myTracer "Buyer2: ") codecRoleBookSt chanBuyer2) buyerPeer2 Nothing
 
-  runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanBuyer) buyerPeer Nothing
+  runPeerWithDriver (driverSimple (myTracer "Buyer: ") codecRoleBookSt chanBuyer) buyerPeer Nothing
   pure ()
