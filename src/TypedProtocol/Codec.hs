@@ -50,11 +50,6 @@ runDecoder _ (DecodeFail failure) = return (Left failure)
 runDecoder [] (DecodePartial k) = k Nothing >>= runDecoder []
 runDecoder (b : bs) (DecodePartial k) = k (Just b) >>= runDecoder bs
 
-data AnyMessage role' ps where
-  AnyMessage
-    :: Msg role' ps send recv st '(st', st'')
-    -> AnyMessage role' ps
-
 data Channel role' m a = Channel
   { sendFun :: forall r. Sing (r :: role') -> a -> m ()
   , recv :: m (Maybe a)

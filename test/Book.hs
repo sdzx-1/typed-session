@@ -122,16 +122,16 @@ instance Protocol Role BookSt where
 codecRoleBookSt
   :: forall m
    . (Monad m)
-  => Codec Role BookSt CodecFailure m (AnyMessage Role BookSt)
+  => Codec Role BookSt CodecFailure m (AnyMsg Role BookSt)
 codecRoleBookSt = Codec{encode, decode}
  where
-  encode _ = AnyMessage
+  encode _ = AnyMsg
   decode
     :: forall (r :: Role) (from :: BookSt)
      . Agency Role BookSt r from
     -> m
         ( DecodeStep
-            (AnyMessage Role BookSt)
+            (AnyMsg Role BookSt)
             CodecFailure
             m
             (SomeMsg Role BookSt r from)
@@ -140,7 +140,7 @@ codecRoleBookSt = Codec{encode, decode}
     pure $ DecodePartial $ \mb ->
       case mb of
         Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-        Just (AnyMessage msg) -> return $
+        Just (AnyMsg msg) -> return $
           case (stok, msg) of
             (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
@@ -155,36 +155,26 @@ budget = 100
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
-  liftm $ putStrLn "buyer send: haskell book"
   yield (Title "haskell book")
   Recv (Price i) <- await
-  liftm $ putStrLn "buyer recv: price"
   if i <= budget
     then I.do
-      liftm $ putStrLn "buyer can buy, send Afford"
       yield Afford
       Recv (Date d) <- await
-      liftm $ putStrLn "buyer recv: Date, Finish"
       returnAt (Just d)
     else I.do
-      liftm $ putStrLn "buyer can't buy, send NotBuy, Finish"
       yield NotBuy
       returnAt Nothing
 
 sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
 sellerPeer = I.do
   Recv (Title _name) <- await
-  liftm $ putStrLn "seller recv: Title"
-  liftm $ putStrLn "seller send: Price"
   yield (Price 30)
   Recv msg <- await
   case msg of
     Afford -> I.do
-      liftm $ putStrLn "seller recv: Afford"
-      liftm $ putStrLn "seller send: Date, Finish"
       yield (Date 100)
     NotBuy -> I.do
-      liftm $ putStrLn "seller recv: NotBuy, Finish"
       returnAt ()
 
 mvarsAsChannel
@@ -196,12 +186,23 @@ mvarsAsChannel bufferRead sendFun =
  where
   recv = atomically (Just <$> takeTMVar bufferRead)
 
+myTracer :: Tracer Role BookSt IO
+myTracer = print
+
+instance Show (AnyMsg Role BookSt) where
+  show (AnyMsg msg) = case msg of
+    Title st -> "Title " <> show st
+    Price i -> "Price " <> show i
+    Afford -> "Afford"
+    Date i -> "Date " <> show i
+    NotBuy -> "NotBuy"
+
 runAll :: IO ()
 runAll = do
-  buyerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
+  buyerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
 
-  let sendFun :: forall r. Sing (r :: Role) -> AnyMessage Role BookSt -> IO ()
+  let sendFun :: forall r. Sing (r :: Role) -> AnyMsg Role BookSt -> IO ()
       sendFun sr a = case sr of
         SBuyer -> atomically $ putTMVar buyerTMVar a
         SSeller -> atomically $ putTMVar sellerTMVar a
@@ -210,7 +211,7 @@ runAll = do
       channel2 = mvarsAsChannel buyerTMVar sendFun
 
   forkIO $ void $ do
-    runPeerWithDriver (driverSimple codecRoleBookSt channel1) sellerPeer Nothing
+    runPeerWithDriver (driverSimple myTracer codecRoleBookSt channel1) sellerPeer Nothing
 
-  runPeerWithDriver (driverSimple codecRoleBookSt channel2) buyerPeer Nothing
+  runPeerWithDriver (driverSimple myTracer codecRoleBookSt channel2) buyerPeer Nothing
   pure ()

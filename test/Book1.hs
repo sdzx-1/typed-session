@@ -1,6 +1,7 @@
 {-# LANGUAGE AllowAmbiguousTypes #-}
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
+{-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
@@ -144,16 +145,16 @@ instance Protocol Role BookSt where
 codecRoleBookSt
   :: forall m
    . (Monad m)
-  => Codec Role BookSt CodecFailure m (AnyMessage Role BookSt)
+  => Codec Role BookSt CodecFailure m (AnyMsg Role BookSt)
 codecRoleBookSt = Codec{encode, decode}
  where
-  encode _ = AnyMessage
+  encode _ = AnyMsg
   decode
     :: forall (r :: Role) (from :: BookSt)
      . Agency Role BookSt r from
     -> m
         ( DecodeStep
-            (AnyMessage Role BookSt)
+            (AnyMsg Role BookSt)
             CodecFailure
             m
             (SomeMsg Role BookSt r from)
@@ -162,7 +163,7 @@ codecRoleBookSt = Codec{encode, decode}
     pure $ DecodePartial $ \mb ->
       case mb of
         Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-        Just (AnyMessage msg) -> return $
+        Just (AnyMsg msg) -> return $
           case (stok, msg) of
             (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
@@ -179,23 +180,16 @@ budget = 16
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
-  liftm $ putStrLn "buyer send: haskell book"
   yield (Title "haskell book")
   Recv (Price i) <- await
-  liftm $ putStrLn "buyer recv: price"
-  liftm $ putStrLn "buyer send price to b2"
   yield (PriceToB2 i)
   Recv (HalfPrice hv) <- await
-  liftm $ putStrLn "buyer recv: b2 half price"
   if i <= hv + budget
     then I.do
-      liftm $ putStrLn "buyer can buy, send Afford"
       yield Afford
       Recv (Date d) <- await
-      liftm $ putStrLn "buyer recv: Date, Finish"
       returnAt (Just d)
     else I.do
-      liftm $ putStrLn "buyer can't buy, send NotBuy, Finish"
       yield NotBuy
       returnAt Nothing
 
@@ -203,24 +197,17 @@ buyerPeer2
   :: Peer Role BookSt Buyer2 IO (At () (Done Buyer2)) S11
 buyerPeer2 = I.do
   Recv (PriceToB2 i) <- await
-  liftm $ putStrLn "buyer2 recv: price"
-  liftm $ putStrLn "buyer2 send half price to buyer, Finish"
   yield (HalfPrice (i `div` 2))
 
 sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
 sellerPeer = I.do
   Recv (Title _name) <- await
-  liftm $ putStrLn "seller recv: Title"
-  liftm $ putStrLn "seller send: Price"
   yield (Price 30)
   Recv msg <- await
   case msg of
     Afford -> I.do
-      liftm $ putStrLn "seller recv: Afford"
-      liftm $ putStrLn "seller send: Date, Finish"
       yield (Date 100)
     NotBuy -> I.do
-      liftm $ putStrLn "seller recv: NotBuy, Finish"
       returnAt ()
 
 newTMV :: s -> IO (s, TMVar a)
@@ -237,13 +224,27 @@ mvarsAsChannel bufferRead sendFun =
  where
   recv = atomically (Just <$> takeTMVar bufferRead)
 
+
+myTracer :: Tracer Role BookSt IO
+myTracer = print
+
+instance Show (AnyMsg Role BookSt) where
+  show (AnyMsg msg) = case msg of
+    Title st -> "Title " <> show st
+    Price i -> "Price " <> show i
+    PriceToB2 i -> "PriceToB2 " <> show i
+    HalfPrice i -> "HalfPrice " <> show i
+    Afford -> "Afford"
+    Date i -> "Date " <> show i
+    NotBuy -> "NotBuy"
+
 runAll :: IO ()
 runAll = do
-  buyerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
-  buyer2TMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
+  buyerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
+  buyer2TMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
 
-  let sendFun :: forall r. Sing (r :: Role) -> AnyMessage Role BookSt -> IO ()
+  let sendFun :: forall r. Sing (r :: Role) -> AnyMsg Role BookSt -> IO ()
       sendFun sr a = case sr of
         SBuyer -> atomically $ putTMVar buyerTMVar a
         SBuyer2 -> atomically $ putTMVar buyer2TMVar a
@@ -254,10 +255,10 @@ runAll = do
       chanBuyer = mvarsAsChannel buyerTMVar sendFun
 
   forkIO $ void $ do
-    runPeerWithDriver (driverSimple codecRoleBookSt chanSeller) sellerPeer Nothing
+    runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanSeller) sellerPeer Nothing
 
   forkIO $ void $ do
-    runPeerWithDriver (driverSimple codecRoleBookSt chanBuyer2) buyerPeer2 Nothing
+    runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanBuyer2) buyerPeer2 Nothing
 
-  runPeerWithDriver (driverSimple codecRoleBookSt chanBuyer) buyerPeer Nothing
+  runPeerWithDriver (driverSimple myTracer codecRoleBookSt chanBuyer) buyerPeer Nothing
   pure ()

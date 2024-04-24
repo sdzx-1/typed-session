@@ -8,6 +8,7 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeOperators #-}
+{-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module TypedProtocol.Driver where
@@ -60,13 +61,32 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     (SomeMsg msg, dstate') <- recvMsg (Agency (sing @r) (sing @st')) dstate
     go dstate' (k msg)
 
+data AnyMsg role' ps where
+  AnyMsg
+    :: Msg role' ps send recv st '(st', st'')
+    -> AnyMsg role' ps
+
+data TraceSendRecv role' ps where
+  TraceSendMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
+  TraceRecvMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
+
+instance (Show (AnyMsg role' ps)) => Show (TraceSendRecv role' ps) where
+  show (TraceSendMsg msg) = "Send " ++ show msg
+  show (TraceRecvMsg msg) = "Recv " ++ show msg
+
+type Tracer role' ps m = TraceSendRecv role' ps -> m ()
+
+nullTracer :: (Monad m) => a -> m ()
+nullTracer _ = pure ()
+
 driverSimple
   :: forall role' ps failure bytes m
    . (Monad m, MonadIO m, Exception failure, Ord role')
-  => Codec role' ps failure m bytes
+  => Tracer role' ps m
+  -> Codec role' ps failure m bytes
   -> Channel role' m bytes
   -> Driver role' ps (Maybe bytes) m
-driverSimple Codec{encode, decode} channel@Channel{sendFun} =
+driverSimple tracer Codec{encode, decode} channel@Channel{sendFun} =
   Driver{sendMsg, recvMsg, startDState = Nothing}
  where
   sendMsg
@@ -74,7 +94,9 @@ driverSimple Codec{encode, decode} channel@Channel{sendFun} =
      . Agency role' ps recv from
     -> Msg role' ps send recv from '(st, st1)
     -> m ()
-  sendMsg stok@(Agency srecv _) msg = sendFun srecv (encode stok msg)
+  sendMsg stok@(Agency srecv _) msg = do
+    sendFun srecv (encode stok msg)
+    tracer (TraceSendMsg (AnyMsg msg))
 
   recvMsg
     :: forall (recv :: role') (from :: ps)
@@ -86,5 +108,7 @@ driverSimple Codec{encode, decode} channel@Channel{sendFun} =
     decoder <- decode stok
     result <- runDecoderWithChannel channel trailing decoder
     case result of
-      Right x -> pure x
+      Right x@(SomeMsg (Recv msg), _) -> do
+        tracer (TraceRecvMsg (AnyMsg msg))
+        pure x
       Left failure -> liftIO $ throwIO failure
