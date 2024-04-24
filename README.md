@@ -1,19 +1,20 @@
 # typed-communication-protocol
-typed communication protocol
-
-
-I'm trying to improve [typed-protocols](https://github.com/input-output-hk/typed-protocols).
-I'm developing this library [typed-communication-protocol](https://github.com/sdzx-1/typed-communication-protocol/tree/main).
-The typed-protocols only allows communication between client-server, but [typed-communication-protocol](https://github.com/sdzx-1/typed-communication-protocol/tree/main) allows communication between any number of roles.
+Typed communication protocol allows communication between any number of roles.
 
 The typed-communication-protocol uses [Mcbride Indexed Monad](https://stackoverflow.com/questions/28690448/what-is-indexed-monad).
 
 This library requires the latest ghc 9.10.1！
 
-Here is a examples：TheBug-ProneBookseller
+Here is a examples：The-Bug-ProneBookseller
+
+
 The example comes from [HasChor: Functional Choreographic Programming for All](https://dl.acm.org/doi/10.1145/3607849)
 
+
 Detailed description:
+
+
+
 <img width="592" alt="屏幕截图 2024-04-22 230819" src="https://github.com/sdzx-1/typed-communication-protocol/assets/63328943/0b8b129e-74bf-445e-a1c6-96d4f5c79f47">
 
 ```haskell
@@ -33,20 +34,19 @@ Detailed description:
 ------------------- Add State ---------------------------
  Buyer                                                      Seller
   :S0                                                        :S0
-       Title  ->
+                     Title  ->
   :S1                                                        :S1
-       <-  Price
-
+                     <-  Price
   :S12
-                                                            :S2 s
+                                                             :S2 s
 
-                     [S2 True]   Afford ->
-     :S3                                             :S3
+     :[S2 True]       Afford ->
+         :S3                                             :S3
                       Data <-
-     :End                                            :End
+         :End                                            :End
 
-                     [S2 False]   NotBuy ->
-     :End                                            :End
+     :[S2 False]      NotBuy ->
+         :End                                            :End
  - -}
 
 ```
@@ -109,7 +109,11 @@ sellerPeer = I.do
     NotBuy -> returnAt ()
 ```
 -----------------------------------------
+
+
  two-buyer bookseller protocol
+
+
 
 <img width="597" alt="屏幕截图 2024-04-22 231527" src="https://github.com/sdzx-1/typed-communication-protocol/assets/63328943/c7f11579-74fd-481e-bf70-140caddfa25e">
 
@@ -119,9 +123,9 @@ sellerPeer = I.do
 -----------------------------------------------
  Buyer                                                   Seller                               Buyer2
   :S0                                                        :S0
-       Title  ->
+                    Title  ->
   :S1                                                        :S1
-       <-  Price
+                    <-  Price
   :S11                                                                                           :S11
                                                                          -> PriceToB2
   :S110                                                                                          :S110
@@ -130,15 +134,15 @@ sellerPeer = I.do
 
                                                             :S2 s
 
-                    [S2 True]   Afford ->
-     :S3                                                  :S3
+     :[S2 True]       Afford ->
+         :S3                                         :S3
                       Data <-
-     :End                                                 :End
+         :End                                        :End
 
-                    [S2 False]   NotBuy ->
-     :End                                                 :End
+     :[S2 False]      NotBuy ->
+         :End                                        :End
 
- - -}
+-}
 ```
 [Code:](https://github.com/sdzx-1/typed-communication-protocol/blob/main/test/Book1.hs)
 ```haskell
