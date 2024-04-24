@@ -33,33 +33,45 @@ import TypedProtocol.Driver
 
 -----------------------------------------------------------------------------------------------
     Buyer                                                      Seller                  Buyer2
-    :S0                                                        :S0
+    :S0                                                        :S0                      :S11
      <                     Title String  ->                     >
     :S1                                                        :S1
-     <                     <-  Price Int                         >
-    :S11                                                       :S12                    :S11
-     <                                  PriceToBuyer2 Int ->                            >
-    :S110                                                                              :S110
-     <                                  <- HalfPrice  Int                               >
-    :S12                                                                               :S113
 
-   ----------------------------------------------------------------------------------------
-   |:S12                                                       :S12
-   | <                  Afford ->                               >
-   |:S3                                                        :S3
-   | <                  <- Date Int                             >
-   | :S113                                                     :End
-   | <                                 Success Int  ->                                  >
-   |:End                                                                              :End
-   ----------------------------------------------------------------------------------------
+ ------------------------------------------------------------------------------------------
+ |  :S1                                                        :S1
+ |   <                     <-  BookNotFound                     >
+ |  :S11                                                       :End                    :S11
+ |   <                                  SellerNotFoundBook ->                            >
+ |  :End                                                                               :End
+ ------------------------------------------------------------------------------------------
 
-   ----------------------------------------------------------------------------------------
-   |:S12                                                       :S12
-   | <                  NotBuy ->                               >
-   | S113                                                      :End
-   | <                                 Failed  ->                                       >
-   |:End                                                                              :End
-   ---------------------------------------------------------------------
+ ------------------------------------------------------------------------------------------
+ |  :S1                                                        :S1
+ |   <                     <-  Price Int                         >
+ |  :S11                                                       :S12                    :S11
+ |   <                                  PriceToBuyer2 Int ->                            >
+ |  :S110                                                                              :S110
+ |   <                                  <- HalfPrice  Int                               >
+ |  :S12                                                                               :S113
+ |
+ | ----------------------------------------------------------------------------------------
+ | |:S12                                                       :S12
+ | | <                  Afford ->                               >
+ | |:S3                                                        :S3
+ | | <                  <- Date Int                             >
+ | | :S113                                                     :End                   :S113
+ | | <                                 Success Int  ->                                  >
+ | |:End                                                                              :End
+ | ----------------------------------------------------------------------------------------
+ |
+ | ----------------------------------------------------------------------------------------
+ | |:S12                                                       :S12
+ | | <                  NotBuy ->                               >
+ | | S113                                                      :End                  :S113
+ | | <                                 Failed  ->                                       >
+ | |:End                                                                             :End
+ | ----------------------------------------------------------------------------------------
+ ------------------------------------------------------------------------------------------
 -}
 
 data Role = Buyer | Seller | Buyer2
@@ -154,6 +166,9 @@ instance Protocol Role BookSt where
     -----------------------
     NotBuy :: Msg Role BookSt Buyer Seller S12 '(S113, End)
     Failed :: Msg Role BookSt Buyer Buyer2 S113 '(End, End)
+    -----------------------
+    BookNotFoun :: Msg Role BookSt Seller Buyer S1 '(End, S11)
+    SellerNotFoundBook :: Msg Role BookSt Buyer Buyer2 S11 '(End, End)
 
 codecRoleBookSt
   :: forall m
@@ -189,49 +204,61 @@ codecRoleBookSt = Codec{encode, decode}
             ------------------------
             (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer2 SS113, Failed{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            ------------------------
+            (Agency SBuyer SS1, BookNotFoun{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SBuyer2 SS11, SellerNotFoundBook{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             _ -> error "np"
 
 budget :: Int
-budget = 13
+budget = 16
 
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
   yield (Title "haskell book")
-  Recv (Price i) <- await
-  yield (PriceToB2 i)
-  Recv (HalfPrice hv) <- await
-  if i <= hv + budget
-    then I.do
-      yield Afford
-      Recv (Date d) <- await
-      yield (Success d)
-      returnAt (Just d)
-    else I.do
-      yield NotBuy
-      yield Failed
+  Recv msg <- await
+  case msg of
+    BookNotFoun -> I.do
+      yield SellerNotFoundBook
       returnAt Nothing
+    Price i -> I.do
+      yield (PriceToB2 i)
+      Recv (HalfPrice hv) <- await
+      if i <= hv + budget
+        then I.do
+          yield Afford
+          Recv (Date d) <- await
+          yield (Success d)
+          returnAt (Just d)
+        else I.do
+          yield NotBuy
+          yield Failed
+          returnAt Nothing
 
 buyerPeer2
   :: Peer Role BookSt Buyer2 IO (At () (Done Buyer2)) S11
 buyerPeer2 = I.do
-  Recv (PriceToB2 i) <- await
-  yield (HalfPrice (i `div` 2))
-  Recv msg <- await
-  case msg of
-    Success _ -> returnAt ()
-    Failed -> returnAt ()
+  Recv msg' <- await
+  case msg' of
+    SellerNotFoundBook -> returnAt ()
+    PriceToB2 i -> I.do
+      yield (HalfPrice (i `div` 2))
+      Recv msg <- await
+      case msg of
+        Success _ -> returnAt ()
+        Failed -> returnAt ()
 
 sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
 sellerPeer = I.do
-  Recv (Title _name) <- await
-  yield (Price 30)
-  Recv msg <- await
-  case msg of
-    Afford -> I.do
-      yield (Date 100)
-    NotBuy -> I.do
-      returnAt ()
+  Recv (Title name) <- await
+  if name /= ""
+    then I.do
+      yield (Price 30)
+      Recv msg <- await
+      case msg of
+        Afford -> yield (Date 100)
+        NotBuy -> returnAt ()
+    else yield BookNotFoun
 
 newTMV :: s -> IO (s, TMVar a)
 newTMV s = do
@@ -261,6 +288,8 @@ instance Show (AnyMsg Role BookSt) where
     NotBuy -> "NotBuy"
     Success i -> "Success " <> show i
     Failed -> "Failed"
+    BookNotFoun -> "BookNotFound"
+    SellerNotFoundBook -> "SellerNotFoundBook"
 
 runAll :: IO ()
 runAll = do
