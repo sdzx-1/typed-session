@@ -45,62 +45,8 @@ Detailed description:
 -}
 
 ```
-[Code:](https://github.com/sdzx-1/typed-communication-protocol/blob/main/test/Book.hs) 
-```haskell
-data Role = Buyer | Seller
-  deriving (Show, Eq, Ord)
 
-data BookSt
-  = S0
-  | S1
-  | S12
-  | S3
-  | End
-
-
-type Date = Int
-
-instance Protocol Role BookSt where
-  type Done Buyer = End
-  type Done Seller = End
-
-  data Msg Role BookSt send recv from to where
-    Title :: String -> Msg Role BookSt Buyer Seller S0 '(S1, S1)
-    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S12, S12)
-    Afford :: Msg Role BookSt Buyer Seller S12 '(S3, S3)
-    Date :: Date -> Msg Role BookSt Seller Buyer S3 '(End, End)
-    NotBuy :: Msg Role BookSt Buyer Seller S12 '(End, End)
-
-budget :: Int
-budget = 100
-
-buyerPeer
-  :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
-buyerPeer = I.do
-  yield (Title "haskell book")
-  Recv (Price i) <- await
-  if i <= budget
-    then I.do
-      yield Afford
-      Recv (Date d) <- await
-      returnAt (Just d)
-    else I.do
-      yield NotBuy
-      returnAt Nothing
-
-sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
-sellerPeer = I.do
-  Recv (Title _name) <- await
-  yield (Price 30)
-  Recv msg <- await
-  case msg of
-    Afford -> yield (Date 100)
-    NotBuy -> returnAt ()
-```
------------------------------------------
-
-
- two-buyer bookseller protocol
+Two-buyer bookseller protocol
 
 
 
