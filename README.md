@@ -19,35 +19,30 @@ Detailed description:
 
 ```haskell
 {-
------------------------------------------------
- role: Buyer Seller
 
- Buyer                            Seller
-       title  ->
-       <-  price
-       checkPrice
-            CheckTrue    Afford ->
-                         data <-
+--------------------------------------------------------------------------
+    Buyer                                                      Seller
+    :S0                                                        :S0
+     <                     Title String  ->                     >
+    :S1                                                        :S1
+     <                     <-  Price Int                         >
+    :S12                                                       :S12
 
-            CheckFalse   NotBuy ->
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  Afford ->                               >
+   |:S3                                                        :S3
+   | <                  <- Data Int                             >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
 
-------------------- Add State ---------------------------
- Buyer                                                      Seller
-  :S0                                                        :S0
-                     Title  ->
-  :S1                                                        :S1
-                     <-  Price
-  :S12
-                                                             :S2 s
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  NotBuy ->                               >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
 
-     :[S2 True]       Afford ->
-         :S3                                             :S3
-                      Data <-
-         :End                                            :End
-
-     :[S2 False]      NotBuy ->
-         :End                                            :End
- - -}
+-}
 
 ```
 [Code:](https://github.com/sdzx-1/typed-communication-protocol/blob/main/test/Book.hs) 
@@ -120,27 +115,32 @@ sellerPeer = I.do
 ```haskell
 {-
 
------------------------------------------------
- Buyer                                                   Seller                               Buyer2
-  :S0                                                        :S0
-                    Title  ->
-  :S1                                                        :S1
-                    <-  Price
-  :S11                                                                                           :S11
-                                                                         -> PriceToB2
-  :S110                                                                                          :S110
-                                                                         <- HalePrice
-  :S12                                                                                           :End
+-----------------------------------------------------------------------------------------------
+    Buyer                                                      Seller                  Buyer2
+    :S0                                                        :S0
+     <                     Title String  ->                     >
+    :S1                                                        :S1
+     <                     <-  Price Int                         >
+    :S11                                                       :S12                    :S11
+     <                                  PriceToBuyer2 Int ->                            >
+    :S110                                                                              :S110
+     <                                  <- HalfPrice  Int                               >
+    :S12                                                                               :End
 
-                                                            :S2 s
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  Afford ->                               >
+   |:S3                                                        :S3
+   | <                  <- Data Int                             >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
 
-     :[S2 True]       Afford ->
-         :S3                                         :S3
-                      Data <-
-         :End                                        :End
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  NotBuy ->                               >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
 
-     :[S2 False]      NotBuy ->
-         :End                                        :End
 
 -}
 ```

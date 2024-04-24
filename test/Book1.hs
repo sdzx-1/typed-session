@@ -20,40 +20,42 @@ module Book1 where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad
-import Data.IFunctor (At (..), ireturn, returnAt)
+import Data.IFunctor (At (..), returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
 import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
-import Unsafe.Coerce (unsafeCoerce)
 
 {-
 
------------------------------------------------
- Buyer                                                   Seller                               Buyer2
-  :S0                                                        :S0
-       Title  ->
-  :S1                                                        :S1
-       <-  Price
-  :S11                                                                                           :S11
-                                                                         -> PriceToB2
-  :S110                                                                                          :S110
-                                                                         <- HalePrice
-  :S12                                                                                           :End
+-----------------------------------------------------------------------------------------------
+    Buyer                                                      Seller                  Buyer2
+    :S0                                                        :S0
+     <                     Title String  ->                     >
+    :S1                                                        :S1
+     <                     <-  Price Int                         >
+    :S11                                                       :S12                    :S11
+     <                                  PriceToBuyer2 Int ->                            >
+    :S110                                                                              :S110
+     <                                  <- HalfPrice  Int                               >
+    :S12                                                                               :End
 
-                                                            :S2 s
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  Afford ->                               >
+   |:S3                                                        :S3
+   | <                  <- Data Int                             >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
 
-                    [S2 True]   Afford ->
-     :S3                                                  :S3
-                      Data <-
-     :End                                                 :End
-
-                    [S2 False]   NotBuy ->
-     :End                                                 :End
-
- - -}
+   ---------------------------------------------------------------------
+   |:S12                                                       :S12
+   | <                  NotBuy ->                               >
+   |:End                                                       :End
+   ---------------------------------------------------------------------
+-}
 
 data Role = Buyer | Seller | Buyer2
   deriving (Show, Eq, Ord)
@@ -89,7 +91,6 @@ data BookSt
   | S11
   | S110
   | S12
-  | S2 Bool
   | S3
   | End
 
@@ -99,7 +100,6 @@ data SBookSt :: BookSt -> Type where
   SS11 :: SBookSt S11
   SS110 :: SBookSt S110
   SS12 :: SBookSt S12
-  SS2 :: SBookSt (S2 (b :: Bool))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
 
@@ -120,9 +120,6 @@ instance SingI S110 where
 instance SingI S12 where
   sing = SS12
 
-instance SingI (S2 s) where
-  sing = SS2
-
 instance SingI S3 where
   sing = SS3
 
@@ -137,12 +134,12 @@ instance Protocol Role BookSt where
   type Done Buyer2 = End
   data Msg Role BookSt send recv from to where
     Title :: String -> Msg Role BookSt Buyer Seller S0 '(S1, S1)
-    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S2 s, S11)
+    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S12, S11)
     PriceToB2 :: Int -> Msg Role BookSt Buyer Buyer2 S11 '(S110, S110)
     HalfPrice :: Int -> Msg Role BookSt Buyer2 Buyer S110 '(End, S12)
-    Afford :: Msg Role BookSt Buyer Seller (S2 True) '(S3, S3)
+    Afford :: Msg Role BookSt Buyer Seller S12 '(S3, S3)
     Date :: Date -> Msg Role BookSt Seller Buyer S3 '(End, End)
-    NotBuy :: Msg Role BookSt Buyer Seller (S2 False) '(End, End)
+    NotBuy :: Msg Role BookSt Buyer Seller S12 '(End, End)
 
 codecRoleBookSt
   :: forall m
@@ -171,23 +168,13 @@ codecRoleBookSt = Codec{encode, decode}
             (Agency SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS2, Afford{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
-            (Agency SSeller SS2, NotBuy{}) -> DecodeDone (SomeMsg (Recv (unsafeCoerce msg))) Nothing
+            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             _ -> error "np"
 
-data CheckPriceResult :: BookSt -> Type where
-  CheckTrue :: CheckPriceResult (S2 True)
-  CheckFalse :: CheckPriceResult (S2 False)
-
 budget :: Int
 budget = 16
-
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12
-checkPrice i h =
-  if i <= budget + h
-    then LiftM $ pure (ireturn CheckTrue)
-    else LiftM $ pure (ireturn CheckFalse)
 
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
@@ -200,15 +187,14 @@ buyerPeer = I.do
   yield (PriceToB2 i)
   Recv (HalfPrice hv) <- await
   liftm $ putStrLn "buyer recv: b2 half price"
-  res <- checkPrice i hv
-  case res of
-    CheckTrue -> I.do
+  if i <= hv + budget
+    then I.do
       liftm $ putStrLn "buyer can buy, send Afford"
       yield Afford
       Recv (Date d) <- await
       liftm $ putStrLn "buyer recv: Date, Finish"
       returnAt (Just d)
-    CheckFalse -> I.do
+    else I.do
       liftm $ putStrLn "buyer can't buy, send NotBuy, Finish"
       yield NotBuy
       returnAt Nothing
