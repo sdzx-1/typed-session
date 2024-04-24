@@ -1,3 +1,4 @@
+--  This part of the code comes from typed-protocols, I modified a few things.
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
@@ -11,7 +12,6 @@
 
 module TypedProtocol.Codec where
 
-import Control.Concurrent.STM
 import Control.Exception (Exception)
 import Data.SR
 import TypedProtocol.Core
@@ -59,15 +59,6 @@ data Channel role' m a = Channel
   { sendFun :: forall r. Sing (r :: role') -> a -> m ()
   , recv :: m (Maybe a)
   }
-
-mvarsAsChannel
-  :: TMVar a
-  -> (forall r. Sing (r :: role') -> (a -> IO ()))
-  -> Channel role' IO a
-mvarsAsChannel bufferRead sendFun =
-  Channel{sendFun, recv}
- where
-  recv = atomically (Just <$> takeTMVar bufferRead)
 
 runDecoderWithChannel
   :: (Monad m)

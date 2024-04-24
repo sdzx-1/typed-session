@@ -1,3 +1,4 @@
+--  This part of the code comes from typed-protocols, I modified a few things.
 {-# LANGUAGE DataKinds #-}
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}

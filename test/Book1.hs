@@ -228,6 +228,15 @@ newTMV s = do
   ntmv <- newEmptyTMVarIO
   pure (s, ntmv)
 
+mvarsAsChannel
+  :: TMVar a
+  -> (forall r. Sing (r :: role') -> (a -> IO ()))
+  -> Channel role' IO a
+mvarsAsChannel bufferRead sendFun =
+  Channel{sendFun, recv}
+ where
+  recv = atomically (Just <$> takeTMVar bufferRead)
+
 runAll :: IO ()
 runAll = do
   buyerTMVar <- newEmptyTMVarIO @(AnyMessage Role BookSt)
