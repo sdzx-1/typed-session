@@ -28,6 +28,8 @@ import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
+import Unsafe.Coerce (unsafeCoerce)
+import Data.IFunctor (ireturn)
 
 {-
 
@@ -37,10 +39,10 @@ import TypedProtocol.Driver
      <                     Title String  ->                     >
     :S1                                                        :S1
      <                     <-  Price Int                         >
-    :S12                                                       :S12
+    :S12'                                                       :S12 s
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12 EnoughBudget                                          :S12 s
    | <                  Afford ->                               >
    |:S3                                                        :S3
    | <                  <- Data Int                             >
@@ -48,7 +50,7 @@ import TypedProtocol.Driver
    ---------------------------------------------------------------------
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12 NotEnoughBuget                                        :S12 s
    | <                  NotBuy ->                               >
    |:End                                                       :End
    ---------------------------------------------------------------------
@@ -75,17 +77,23 @@ instance Reify Buyer where
 instance Reify Seller where
   reifyProxy _ = Seller
 
+data BudgetSt
+  = EnoughBudget
+  | NotEnoughBuget
+
 data BookSt
   = S0
   | S1
-  | S12
+  | S12'
+  | S12 BudgetSt
   | S3
   | End
 
 data SBookSt :: BookSt -> Type where
   SS0 :: SBookSt S0
   SS1 :: SBookSt S1
-  SS12 :: SBookSt S12
+  SS12' :: SBookSt S12'
+  SS12 :: SBookSt (S12 (s :: BudgetSt))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
 
@@ -97,7 +105,10 @@ instance SingI S0 where
 instance SingI S1 where
   sing = SS1
 
-instance SingI S12 where
+instance SingI S12' where
+  sing = SS12'
+
+instance SingI (S12 s) where
   sing = SS12
 
 instance SingI S3 where
@@ -114,10 +125,10 @@ instance Protocol Role BookSt where
 
   data Msg Role BookSt from send recv where
     Title  :: String -> Msg Role BookSt S0  '(Buyer,  S1)   '(Seller, S1)
-    Price  :: Int ->    Msg Role BookSt S1  '(Seller, S12)  '(Buyer,  S12)
-    Afford ::           Msg Role BookSt S12 '(Buyer,  S3)   '(Seller, S3)
+    Price  :: Int ->    Msg Role BookSt S1  '(Seller, S12 s)  '(Buyer,  S12')
+    Afford ::           Msg Role BookSt (S12 EnoughBudget) '(Buyer,  S3)   '(Seller, S3)
     Date   :: Date ->   Msg Role BookSt S3  '(Seller, End)  '(Buyer,  End)
-    NotBuy ::           Msg Role BookSt S12 '(Buyer,  End)  '(Seller, End)
+    NotBuy ::           Msg Role BookSt (S12 NotEnoughBuget) '(Buyer,  End)  '(Seller, End)
 
 codecRoleBookSt
   :: forall m
@@ -145,24 +156,35 @@ codecRoleBookSt = Codec{encode, decode}
             (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
+            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
             _ -> error "np"
 
 budget :: Int
 budget = 100
+
+data CheckPriceResult :: BookSt -> Type where
+  Yes :: CheckPriceResult (S12 EnoughBudget)
+  No :: CheckPriceResult (S12 NotEnoughBuget)
+
+checkPrice :: Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
+checkPrice i = 
+  if i <= budget
+  then LiftM $ pure (ireturn Yes)
+  else LiftM $ pure (ireturn No)
 
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
   yield (Title "haskell book")
   Recv (Price i) <- await
-  if i <= budget
-    then I.do
+  res <- checkPrice i
+  case res of
+    Yes -> I.do
       yield Afford
       Recv (Date d) <- await
       returnAt (Just d)
-    else I.do
+    No -> I.do
       yield NotBuy
       returnAt Nothing
 
