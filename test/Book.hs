@@ -112,12 +112,12 @@ instance Protocol Role BookSt where
   type Done Buyer = End
   type Done Seller = End
 
-  data Msg Role BookSt send recv from to where
-    Title :: String -> Msg Role BookSt Buyer Seller S0 '(S1, S1)
-    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S12, S12)
-    Afford :: Msg Role BookSt Buyer Seller S12 '(S3, S3)
-    Date :: Date -> Msg Role BookSt Seller Buyer S3 '(End, End)
-    NotBuy :: Msg Role BookSt Buyer Seller S12 '(End, End)
+  data Msg Role BookSt from send recv where
+    Title  :: String -> Msg Role BookSt S0  '(Buyer,  S1)   '(Seller, S1)
+    Price  :: Int ->    Msg Role BookSt S1  '(Seller, S12)  '(Buyer,  S12)
+    Afford ::           Msg Role BookSt S12 '(Buyer,  S3)   '(Seller, S3)
+    Date   :: Date ->   Msg Role BookSt S3  '(Seller, End)  '(Buyer,  End)
+    NotBuy ::           Msg Role BookSt S12 '(Buyer,  End)  '(Seller, End)
 
 codecRoleBookSt
   :: forall m

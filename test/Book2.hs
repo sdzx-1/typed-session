@@ -154,21 +154,18 @@ instance Protocol Role BookSt where
   type Done Buyer = End
   type Done Seller = End
   type Done Buyer2 = End
-  data Msg Role BookSt send recv from to where
-    Title :: String -> Msg Role BookSt Buyer Seller S0 '(S1, S1)
-    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S12, S11)
-    PriceToB2 :: Int -> Msg Role BookSt Buyer Buyer2 S11 '(S110, S110)
-    HalfPrice :: Int -> Msg Role BookSt Buyer2 Buyer S110 '(S113, S12)
-    -----------------------
-    Afford :: Msg Role BookSt Buyer Seller S12 '(S3, S3)
-    Date :: Date -> Msg Role BookSt Seller Buyer S3 '(End, S113)
-    Success :: Int -> Msg Role BookSt Buyer Buyer2 S113 '(End, End)
-    -----------------------
-    NotBuy :: Msg Role BookSt Buyer Seller S12 '(S113, End)
-    Failed :: Msg Role BookSt Buyer Buyer2 S113 '(End, End)
-    -----------------------
-    BookNotFoun :: Msg Role BookSt Seller Buyer S1 '(End, S11)
-    SellerNotFoundBook :: Msg Role BookSt Buyer Buyer2 S11 '(End, End)
+  data Msg Role BookSt from send recv  where
+    Title              :: String -> Msg Role BookSt S0   '(Buyer , S1)   '(Seller ,S1)
+    Price              :: Int ->    Msg Role BookSt S1   '(Seller, S12)  '(Buyer  ,S11)
+    PriceToB2          :: Int ->    Msg Role BookSt S11  '(Buyer , S110) '(Buyer2 ,S110)
+    HalfPrice          :: Int ->    Msg Role BookSt S110 '(Buyer2, S113) '(Buyer  ,S12)
+    Afford             ::           Msg Role BookSt S12  '(Buyer , S3)   '(Seller ,S3)
+    Date               :: Date ->   Msg Role BookSt S3   '(Seller, End)  '(Buyer  ,S113)
+    Success            :: Int ->    Msg Role BookSt S113 '(Buyer , End)  '(Buyer2 ,End)
+    NotBuy             ::           Msg Role BookSt S12  '(Buyer , S113) '(Seller ,End)
+    Failed             ::           Msg Role BookSt S113 '(Buyer , End)  '(Buyer2 ,End)
+    BookNotFoun        ::           Msg Role BookSt S1   '(Seller, End)  '(Buyer  ,S11)
+    SellerNotFoundBook ::           Msg Role BookSt S11  '(Buyer , End)  '(Buyer2 ,End)
 
 codecRoleBookSt
   :: forall m

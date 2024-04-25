@@ -20,7 +20,7 @@ data Codec role' ps failure m bytes = Codec
   { encode
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
        . Agency role' ps recv st
-      -> Msg role' ps send recv st '(st', st'')
+      -> Msg role' ps st '(send, st') '(recv, st'')
       -> bytes
   , decode
       :: forall (recv :: role') (from :: ps)

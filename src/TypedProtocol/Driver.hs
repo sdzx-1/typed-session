@@ -27,7 +27,7 @@ data Driver role' ps dstate m
   { sendMsg
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
        . Agency role' ps recv st
-      -> Msg role' ps send recv st '(st', st'')
+      -> Msg role' ps st '(send, st') '(recv, st'')
       -> m ()
   , recvMsg
       :: forall (recv :: role') (from :: ps)
@@ -54,7 +54,7 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     -> m (a, dstate)
   go dstate (IReturn (At a)) = pure (a, dstate)
   go dstate (LiftM k) = k >>= go dstate
-  go dstate (Yield (msg :: Msg role' ps r (recv :: role') (st' :: ps) '(sps, rps)) k) = do
+  go dstate (Yield (msg :: Msg role' ps (st' :: ps) '(r, sps) '(recv :: role', rps)) k) = do
     sendMsg (Agency (sing @recv) (sing @st')) msg
     go dstate k
   go dstate (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
@@ -63,7 +63,7 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
 
 data AnyMsg role' ps where
   AnyMsg
-    :: Msg role' ps send recv st '(st', st'')
+    :: Msg role' ps st '(send, st') '(recv, st'')
     -> AnyMsg role' ps
 
 data TraceSendRecv role' ps where
@@ -92,7 +92,7 @@ driverSimple tracer Codec{encode, decode} channel@Channel{sendFun} =
   sendMsg
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
      . Agency role' ps recv from
-    -> Msg role' ps send recv from '(st, st1)
+    -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
   sendMsg stok@(Agency srecv _) msg = do
     sendFun srecv (encode stok msg)
