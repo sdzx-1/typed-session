@@ -26,10 +26,10 @@ Detailed description:
      <                     Title String  ->                     >
     :S1                                                        :S1
      <                     <-  Price Int                         >
-    :S12                                                       :S12
+    :S12'                                                       :S12 s
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12 EnoughBudget                                          :S12 s
    | <                  Afford ->                               >
    |:S3                                                        :S3
    | <                  <- Data Int                             >
@@ -37,11 +37,10 @@ Detailed description:
    ---------------------------------------------------------------------
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12 NotEnoughBuget                                        :S12 s
    | <                  NotBuy ->                               >
    |:End                                                       :End
    ---------------------------------------------------------------------
-
 -}
 
 ```
@@ -61,14 +60,14 @@ Two-buyer bookseller protocol
      <                     Title String  ->                     >
     :S1                                                        :S1
      <                     <-  Price Int                         >
-    :S11                                                       :S12                    :S11
+    :S11                                                       :S12 s                  :S11
      <                                  PriceToBuyer2 Int ->                            >
     :S110                                                                              :S110
      <                                  <- HalfPrice  Int                               >
-    :S12                                                                               :End
+    :S12'                                                                               :End
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12 EnoughBudget                                          :S12 s
    | <                  Afford ->                               >
    |:S3                                                        :S3
    | <                  <- Data Int                             >
@@ -76,11 +75,10 @@ Two-buyer bookseller protocol
    ---------------------------------------------------------------------
 
    ---------------------------------------------------------------------
-   |:S12                                                       :S12
+   |:S12  NotEnoughBuget                                       :S12
    | <                  NotBuy ->                               >
    |:End                                                       :End
    ---------------------------------------------------------------------
-
 
 -}
 ```
@@ -90,15 +88,19 @@ Two-buyer bookseller protocol
 data Role = Buyer | Seller | Buyer2
   deriving (Show, Eq, Ord)
 
+data BudgetSt
+  = EnoughBudget
+  | NotEnoughBuget
+
 data BookSt
   = S0
   | S1
   | S11
   | S110
-  | S12
+  | S12'
+  | S12 BudgetSt
   | S3
   | End
-
 
 type Date = Int
 
@@ -106,17 +108,27 @@ instance Protocol Role BookSt where
   type Done Buyer = End
   type Done Seller = End
   type Done Buyer2 = End
-  data Msg Role BookSt send recv from to where
-    Title :: String -> Msg Role BookSt Buyer Seller S0 '(S1, S1)
-    Price :: Int -> Msg Role BookSt Seller Buyer S1 '(S12, S11)
-    PriceToB2 :: Int -> Msg Role BookSt Buyer Buyer2 S11 '(S110, S110)
-    HalfPrice :: Int -> Msg Role BookSt Buyer2 Buyer S110 '(End, S12)
-    Afford :: Msg Role BookSt Buyer Seller S12 '(S3, S3)
-    Date :: Date -> Msg Role BookSt Seller Buyer S3 '(End, End)
-    NotBuy :: Msg Role BookSt Buyer Seller S12 '(End, End)
+  data Msg Role BookSt from send recv  where
+    Title     :: String -> Msg Role BookSt S0                   '(Buyer, S1)       '(Seller, S1) 
+    Price     :: Int ->    Msg Role BookSt S1                   '(Seller, S12 s)   '(Buyer, S11) 
+    PriceToB2 :: Int ->    Msg Role BookSt S11                  '(Buyer  ,S110)    '(Buyer2 ,S110) 
+    HalfPrice :: Int ->    Msg Role BookSt S110                 '(Buyer2 ,End)     '(Buyer  ,S12') 
+    Afford    ::           Msg Role BookSt (S12 EnoughBudget)   '(Buyer  ,S3)      '(Seller ,S3) 
+    Date      :: Date ->   Msg Role BookSt S3                   '(Seller ,End)     '(Buyer  ,End)
+    NotBuy    ::           Msg Role BookSt (S12 NotEnoughBuget) '(Buyer  ,End)     '(Seller ,End)
 
 budget :: Int
 budget = 16
+
+data CheckPriceResult :: BookSt -> Type where
+  Yes :: CheckPriceResult (S12 EnoughBudget)
+  No :: CheckPriceResult (S12 NotEnoughBuget)
+
+checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
+checkPrice i h = 
+  if i <= budget + h
+  then LiftM $ pure (ireturn Yes)
+  else LiftM $ pure (ireturn No)
 
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
@@ -125,12 +137,13 @@ buyerPeer = I.do
   Recv (Price i) <- await
   yield (PriceToB2 i)
   Recv (HalfPrice hv) <- await
-  if i <= hv + budget
-    then I.do
+  res <- checkPrice i hv
+  case res of
+    Yes -> I.do
       yield Afford
       Recv (Date d) <- await
       returnAt (Just d)
-    else I.do
+    No -> I.do
       yield NotBuy
       returnAt Nothing
 
@@ -146,11 +159,14 @@ sellerPeer = I.do
   yield (Price 30)
   Recv msg <- await
   case msg of
-    Afford -> yield (Date 100)
-    NotBuy -> returnAt ()
+    Afford -> I.do
+      yield (Date 100)
+    NotBuy -> I.do
+      returnAt ()
+
 ```
 ---------------------------------------------
-You can run these two examples: cabal test
+You can run these examples: cabal test
 
 result: 
 
@@ -181,4 +197,72 @@ Buyer: Recv Date 100
 
 ```
 
+---------------------------------------------
+Here is the more complex book2. 
 
+In book2, the seller checks whether the Title exists, 
+and the buyer will notify buyer2 of various results.
+
+```haskell
+{-
+
+-----------------------------------------------------------------------------------------------
+    Buyer                                                      Seller                  Buyer2
+    :S0                                                        :S0                      :S11
+     <                     Title String  ->                     >
+    :S1 s                                                      :S1'
+
+ ------------------------------------------------------------------------------------------
+ |  :S1 s                                                      :S1 BookNotFound
+ |   <                     <-  BookNotFound                     >
+ |  :S11                                                       :End                    :S11
+ |   <                                  SellerNotFoundBook ->                            >
+ |  :End                                                                               :End
+ ------------------------------------------------------------------------------------------
+
+ ------------------------------------------------------------------------------------------
+ |  :S1 s                                                      :S1 BookFound
+ |   <                     <-  Price Int                         >
+ |  :S11                                                       :S12 s                  :S11
+ |   <                                  PriceToBuyer2 Int ->                            >
+ |  :S110                                                                              :S110
+ |   <                                  <- HalfPrice  Int                               >
+ |  :S12'                                                                              :S113
+ |
+ | ----------------------------------------------------------------------------------------
+ | |:S12  EnoughBudget                                         :S12 s
+ | | <                  Afford ->                               >
+ | |:S3                                                        :S3
+ | | <                  <- Date Int                             >
+ | | :S113                                                     :End                   :S113
+ | | <                                 Success Int  ->                                  >
+ | |:End                                                                              :End
+ | ----------------------------------------------------------------------------------------
+ |
+ | ----------------------------------------------------------------------------------------
+ | |:S12  NotEnoughBuget                                       :S12 s
+ | | <                  NotBuy ->                               >
+ | | S113                                                      :End                  :S113
+ | | <                                 Failed  ->                                       >
+ | |:End                                                                             :End
+ | ----------------------------------------------------------------------------------------
+ ------------------------------------------------------------------------------------------
+-}
+
+instance Protocol Role BookSt where
+  type Done Buyer = End
+  type Done Seller = End
+  type Done Buyer2 = End
+  data Msg Role BookSt from send recv  where
+    Title              :: String -> Msg Role BookSt S0   '(Buyer , S1 s)   '(Seller ,S1')
+    Price              :: Int ->    Msg Role BookSt (S1 BookFound)   '(Seller, S12 s)  '(Buyer  ,S11)
+    PriceToB2          :: Int ->    Msg Role BookSt S11  '(Buyer , S110) '(Buyer2 ,S110)
+    HalfPrice          :: Int ->    Msg Role BookSt S110 '(Buyer2, S113) '(Buyer  ,S12')
+    Afford             ::           Msg Role BookSt (S12 EnoughBudget)  '(Buyer , S3)   '(Seller ,S3)
+    Date               :: Date ->   Msg Role BookSt S3   '(Seller, End)  '(Buyer  ,S113)
+    Success            :: Int ->    Msg Role BookSt S113 '(Buyer , End)  '(Buyer2 ,End)
+    NotBuy             ::           Msg Role BookSt (S12 NotEnoughBuget)  '(Buyer , S113) '(Seller ,End)
+    Failed             ::           Msg Role BookSt S113 '(Buyer , End)  '(Buyer2 ,End)
+    BookNotFoun        ::           Msg Role BookSt (S1 BookNotFound)   '(Seller, End)  '(Buyer  ,S11)
+    SellerNotFoundBook ::           Msg Role BookSt S11  '(Buyer , End)  '(Buyer2 ,End)
+```

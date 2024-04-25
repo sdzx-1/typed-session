@@ -40,7 +40,7 @@ import Data.IFunctor (ireturn)
     :S1 s                                                      :S1'
 
  ------------------------------------------------------------------------------------------
- |  :S1 s                                                      :S1 BookFound
+ |  :S1 s                                                      :S1 BookNotFound
  |   <                     <-  BookNotFound                     >
  |  :S11                                                       :End                    :S11
  |   <                                  SellerNotFoundBook ->                            >
@@ -48,7 +48,7 @@ import Data.IFunctor (ireturn)
  ------------------------------------------------------------------------------------------
 
  ------------------------------------------------------------------------------------------
- |  :S1 s                                                      :S1 BookNotFound
+ |  :S1 s                                                      :S1 BookFound
  |   <                     <-  Price Int                         >
  |  :S11                                                       :S12 s                  :S11
  |   <                                  PriceToBuyer2 Int ->                            >
