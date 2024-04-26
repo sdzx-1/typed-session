@@ -28,7 +28,6 @@ import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
-import Unsafe.Coerce (unsafeCoerce)
 
 {-
 
@@ -210,19 +209,19 @@ codecRoleBookSt = Codec{encode, decode}
         Just (AnyMsg msg) -> return $
           case (stok, msg) of
             (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
-            (Agency SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
+            (Agency SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             (Agency SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             ------------------------
-            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SBuyer2 SS113, Success{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SBuyer2 SS113, Success{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             ------------------------
-            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
-            (Agency SBuyer2 SS113, Failed{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
+            (Agency SBuyer2 SS113, Failed{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             ------------------------
-            (Agency SBuyer SS1, BookNotFoun{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
-            (Agency SBuyer2 SS11, SellerNotFoundBook{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SBuyer SS1, BookNotFoun{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
+            (Agency SBuyer2 SS11, SellerNotFoundBook{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             _ -> error "np"
 
 budget :: Int

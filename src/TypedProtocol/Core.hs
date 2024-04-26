@@ -13,6 +13,7 @@ module TypedProtocol.Core where
 import Data.IFunctor
 import Data.Kind
 import Data.SR
+import Unsafe.Coerce (unsafeCoerce)
 
 class Protocol role' ps where
   type Done (sr :: role') :: ps
@@ -22,6 +23,18 @@ data Recv role' ps recv from to where
   Recv
     :: Msg role' ps from '(send, sps) '(recv, rps)
     -> Recv role' ps recv from rps
+
+liftMsg
+  :: forall role' ps ws s a send recv
+   . Msg role' ps (ws s) send recv
+  -> Msg role' ps (ws a) send recv
+liftMsg = unsafeCoerce
+
+liftRecv
+  :: forall role' ps ws s a send recv sps rps
+   . Msg role' ps (ws s) '(send, sps) '(recv, rps)
+  -> Recv role' ps recv (ws a) rps
+liftRecv s = Recv $ liftMsg s
 
 data Agency role' ps r st where
   Agency :: Sing (r :: role') -> Sing (st :: ps) -> Agency role' ps r st

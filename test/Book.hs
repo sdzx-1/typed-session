@@ -28,7 +28,6 @@ import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
-import Unsafe.Coerce (unsafeCoerce)
 import Data.IFunctor (ireturn)
 
 {-
@@ -156,8 +155,8 @@ codecRoleBookSt = Codec{encode, decode}
             (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
             (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
-            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (Recv $ unsafeCoerce msg)) Nothing
+            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
+            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
             _ -> error "np"
 
 budget :: Int
