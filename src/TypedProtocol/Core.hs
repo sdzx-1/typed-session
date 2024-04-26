@@ -12,7 +12,6 @@ module TypedProtocol.Core where
 
 import Data.IFunctor
 import Data.Kind
-import Data.SR
 import Unsafe.Coerce (unsafeCoerce)
 
 class Protocol role' ps where

@@ -21,10 +21,9 @@ module Book2 where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad
-import Data.IFunctor (At (..), ireturn, returnAt)
+import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
-import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
@@ -92,15 +91,6 @@ instance SingI Buyer2 where
 
 instance SingI Seller where
   sing = SSeller
-
-instance Reify Buyer where
-  reifyProxy _ = Buyer
-
-instance Reify Buyer2 where
-  reifyProxy _ = Buyer2
-
-instance Reify Seller where
-  reifyProxy _ = Seller
 
 data FindBook
   = BookNotFound

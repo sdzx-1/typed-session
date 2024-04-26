@@ -15,9 +15,8 @@ module TypedProtocol.Driver where
 
 import Control.Exception (throwIO)
 import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.IFunctor (At (..))
+import Data.IFunctor (At (..), SingI (sing))
 import qualified Data.IFunctor as I
-import Data.SR
 import GHC.Exception (Exception)
 import TypedProtocol.Codec
 import TypedProtocol.Core

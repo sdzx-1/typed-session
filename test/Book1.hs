@@ -21,14 +21,12 @@ module Book1 where
 import Control.Concurrent (forkIO)
 import Control.Concurrent.STM
 import Control.Monad
-import Data.IFunctor (At (..), returnAt)
+import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
-import Data.SR
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
-import Data.IFunctor (ireturn)
 
 {-
 
@@ -77,15 +75,6 @@ instance SingI Buyer2 where
 
 instance SingI Seller where
   sing = SSeller
-
-instance Reify Buyer where
-  reifyProxy _ = Buyer
-
-instance Reify Buyer2 where
-  reifyProxy _ = Buyer2
-
-instance Reify Seller where
-  reifyProxy _ = Seller
 
 data BudgetSt
   = EnoughBudget
@@ -143,14 +132,14 @@ instance Protocol Role BookSt where
   type Done Buyer = End
   type Done Seller = End
   type Done Buyer2 = End
-  data Msg Role BookSt from send recv  where
-    Title     :: String -> Msg Role BookSt S0   '(Buyer, S1)     '(Seller, S1) 
-    Price     :: Int ->    Msg Role BookSt S1   '(Seller, S12 s)   '(Buyer, S11) 
-    PriceToB2 :: Int ->    Msg Role BookSt S11  '(Buyer  ,S110)  '(Buyer2 ,S110) 
-    HalfPrice :: Int ->    Msg Role BookSt S110 '(Buyer2 ,End)   '(Buyer  ,S12') 
-    Afford    ::           Msg Role BookSt (S12 EnoughBudget)  '(Buyer  ,S3)    '(Seller ,S3) 
-    Date      :: Date ->   Msg Role BookSt S3   '(Seller ,End)   '(Buyer  ,End)
-    NotBuy    ::           Msg Role BookSt (S12 NotEnoughBuget)  '(Buyer  ,End)   '(Seller ,End)
+  data Msg Role BookSt from send recv where
+    Title :: String -> Msg Role BookSt S0 '(Buyer, S1) '(Seller, S1)
+    Price :: Int -> Msg Role BookSt S1 '(Seller, S12 s) '(Buyer, S11)
+    PriceToB2 :: Int -> Msg Role BookSt S11 '(Buyer, S110) '(Buyer2, S110)
+    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, End) '(Buyer, S12')
+    Afford :: Msg Role BookSt (S12 EnoughBudget) '(Buyer, S3) '(Seller, S3)
+    Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, End)
+    NotBuy :: Msg Role BookSt (S12 NotEnoughBuget) '(Buyer, End) '(Seller, End)
 
 codecRoleBookSt
   :: forall m
@@ -192,10 +181,10 @@ data CheckPriceResult :: BookSt -> Type where
   No :: CheckPriceResult (S12 NotEnoughBuget)
 
 checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
-checkPrice i h = 
+checkPrice i h =
   if i <= budget + h
-  then LiftM $ pure (ireturn Yes)
-  else LiftM $ pure (ireturn No)
+    then LiftM $ pure (ireturn Yes)
+    else LiftM $ pure (ireturn No)
 
 buyerPeer
   :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0

@@ -59,7 +59,6 @@ library
 
     -- Modules exported by the library.
     exposed-modules: Data.IFunctor
-                   , Data.SR
                    , TypedProtocol.Core
                    , TypedProtocol.Codec
                    , TypedProtocol.Driver

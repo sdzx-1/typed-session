@@ -13,7 +13,7 @@
 module TypedProtocol.Codec where
 
 import Control.Exception (Exception)
-import Data.SR
+import Data.IFunctor (Sing)
 import TypedProtocol.Core
 
 data Codec role' ps failure m bytes = Codec
