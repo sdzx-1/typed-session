@@ -36,7 +36,7 @@ import TypedProtocol.Driver
      <                     Title String  ->                     >
     :S1                                                        :S1
      <                     <-  Price Int                         >
-    :S12'                                                       :S12 s
+    :S12 s                                                     :S12 s
 
    ---------------------------------------------------------------------
    |:S12 EnoughBudget                                          :S12 s
@@ -75,7 +75,6 @@ data BudgetSt
 data BookSt
   = S0
   | S1
-  | S12'
   | S12 BudgetSt
   | S3
   | End
@@ -83,7 +82,6 @@ data BookSt
 data SBookSt :: BookSt -> Type where
   SS0 :: SBookSt S0
   SS1 :: SBookSt S1
-  SS12' :: SBookSt S12'
   SS12 :: SBookSt (S12 (s :: BudgetSt))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
@@ -95,9 +93,6 @@ instance SingI S0 where
 
 instance SingI S1 where
   sing = SS1
-
-instance SingI S12' where
-  sing = SS12'
 
 instance SingI (S12 s) where
   sing = SS12
@@ -116,7 +111,7 @@ instance Protocol Role BookSt where
 
   data Msg Role BookSt from send recv where
     Title :: String -> Msg Role BookSt S0 '(Buyer, S1) '(Seller, S1)
-    Price :: Int -> Msg Role BookSt S1 '(Seller, S12 s) '(Buyer, S12')
+    Price :: Int -> Msg Role BookSt S1 '(Seller, S12 s) '(Buyer, S12 s)
     Afford :: Msg Role BookSt (S12 EnoughBudget) '(Buyer, S3) '(Seller, S3)
     Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, End)
     NotBuy :: Msg Role BookSt (S12 NotEnoughBuget) '(Buyer, End) '(Seller, End)
@@ -158,7 +153,7 @@ data CheckPriceResult :: BookSt -> Type where
   Yes :: CheckPriceResult (S12 EnoughBudget)
   No :: CheckPriceResult (S12 NotEnoughBuget)
 
-checkPrice :: Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
+checkPrice :: Int -> Peer Role BookSt Buyer IO CheckPriceResult (S12 s)
 checkPrice i =
   if i <= budget
     then LiftM $ pure (ireturn Yes)

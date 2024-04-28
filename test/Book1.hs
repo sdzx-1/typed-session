@@ -40,7 +40,7 @@ import TypedProtocol.Driver
      <                                  PriceToBuyer2 Int ->                            >
     :S110                                                                              :S110
      <                                  <- HalfPrice  Int                               >
-    :S12'                                                                               :End
+    :S12 s                                                                             :End
 
    ---------------------------------------------------------------------
    |:S12 EnoughBudget                                          :S12 s
@@ -85,7 +85,6 @@ data BookSt
   | S1
   | S11
   | S110
-  | S12'
   | S12 BudgetSt
   | S3
   | End
@@ -95,7 +94,6 @@ data SBookSt :: BookSt -> Type where
   SS1 :: SBookSt S1
   SS11 :: SBookSt S11
   SS110 :: SBookSt S110
-  SS12' :: SBookSt S12'
   SS12 :: SBookSt (S12 (s :: BudgetSt))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
@@ -113,9 +111,6 @@ instance SingI S11 where
 
 instance SingI S110 where
   sing = SS110
-
-instance SingI S12' where
-  sing = SS12'
 
 instance SingI (S12 s) where
   sing = SS12
@@ -136,7 +131,7 @@ instance Protocol Role BookSt where
     Title :: String -> Msg Role BookSt S0 '(Buyer, S1) '(Seller, S1)
     Price :: Int -> Msg Role BookSt S1 '(Seller, S12 s) '(Buyer, S11)
     PriceToB2 :: Int -> Msg Role BookSt S11 '(Buyer, S110) '(Buyer2, S110)
-    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, End) '(Buyer, S12')
+    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, End) '(Buyer, S12 s)
     Afford :: Msg Role BookSt (S12 EnoughBudget) '(Buyer, S3) '(Seller, S3)
     Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, End)
     NotBuy :: Msg Role BookSt (S12 NotEnoughBuget) '(Buyer, End) '(Seller, End)
@@ -180,7 +175,7 @@ data CheckPriceResult :: BookSt -> Type where
   Yes :: CheckPriceResult (S12 EnoughBudget)
   No :: CheckPriceResult (S12 NotEnoughBuget)
 
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
+checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult (S12 s)
 checkPrice i h =
   if i <= budget + h
     then LiftM $ pure (ireturn Yes)

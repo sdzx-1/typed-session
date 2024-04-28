@@ -34,7 +34,7 @@ import TypedProtocol.Driver
     Buyer                                                      Seller                  Buyer2
     :S0                                                        :S0                      :S11 s
      <                     Title String  ->                     >
-    :S1 s                                                      :S1'
+    :S1 s                                                      :S1 s
 
  ------------------------------------------------------------------------------------------
  |  :S1 s                                                      :S1 BookNotFound
@@ -51,7 +51,7 @@ import TypedProtocol.Driver
  |   <                                  PriceToBuyer2 Int ->                            >
  |  :S110                                                                              :S110
  |   <                                  <- HalfPrice  Int                               >
- |  :S12'                                                                              :S113 s
+ |  :S12 s                                                                             :S113 s
  |
  | ----------------------------------------------------------------------------------------
  | |:S12  EnoughBudget                                         :S12 s
@@ -102,24 +102,20 @@ data BudgetSt
 
 data BookSt
   = S0
-  | S1'
   | S1 FindBook
   | S11 FindBook
   | S110
   | S113 BudgetSt
-  | S12'
   | S12 BudgetSt
   | S3
   | End
 
 data SBookSt :: BookSt -> Type where
   SS0 :: SBookSt S0
-  SS1' :: SBookSt S1'
   SS1 :: SBookSt (S1 (s :: FindBook))
   SS11 :: SBookSt (S11 (s :: FindBook))
   SS110 :: SBookSt S110
   SS113 :: SBookSt (S113 (s :: BudgetSt))
-  SS12' :: SBookSt S12'
   SS12 :: SBookSt (S12 (s :: BudgetSt))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
@@ -128,9 +124,6 @@ type instance Sing = SBookSt
 
 instance SingI S0 where
   sing = SS0
-
-instance SingI S1' where
-  sing = SS1'
 
 instance SingI (S1 s) where
   sing = SS1
@@ -143,9 +136,6 @@ instance SingI S110 where
 
 instance SingI (S113 s) where
   sing = SS113
-
-instance SingI S12' where
-  sing = SS12'
 
 instance SingI (S12 s) where
   sing = SS12
@@ -163,10 +153,10 @@ instance Protocol Role BookSt where
   type Done Seller = End
   type Done Buyer2 = End
   data Msg Role BookSt from send recv where
-    Title :: String -> Msg Role BookSt S0 '(Buyer, S1 s) '(Seller, S1')
+    Title :: String -> Msg Role BookSt S0 '(Buyer, S1 s) '(Seller, S1 s)
     Price :: Int -> Msg Role BookSt (S1 BookFound) '(Seller, S12 s) '(Buyer, S11 BookFound)
     PriceToB2 :: Int -> Msg Role BookSt (S11 BookFound) '(Buyer, S110) '(Buyer2, S110)
-    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, S113 s) '(Buyer, S12')
+    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, S113 s) '(Buyer, S12 s)
     Afford :: Msg Role BookSt (S12 EnoughBudget) '(Buyer, S3) '(Seller, S3)
     Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, S113 EnoughBudget)
     Success :: Int -> Msg Role BookSt (S113 EnoughBudget) '(Buyer, End) '(Buyer2, End)
@@ -221,7 +211,7 @@ data CheckPriceResult :: BookSt -> Type where
   Yes :: CheckPriceResult (S12 EnoughBudget)
   No :: CheckPriceResult (S12 NotEnoughBuget)
 
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult S12'
+checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult (S12 s)
 checkPrice i h =
   if i <= budget + h
     then LiftM $ pure (ireturn Yes)
@@ -268,7 +258,7 @@ data FindBookResult :: BookSt -> Type where
   Found :: FindBookResult (S1 BookFound)
   NotFound :: FindBookResult (S1 BookNotFound)
 
-findBook :: String -> Peer Role BookSt Seller IO FindBookResult S1'
+findBook :: String -> Peer Role BookSt Seller IO FindBookResult (S1 s)
 findBook st =
   if st /= ""
     then LiftM $ pure (ireturn Found)
