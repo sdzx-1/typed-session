@@ -19,13 +19,13 @@ import TypedProtocol.Core
 data Codec role' ps failure m bytes = Codec
   { encode
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . Agency role' ps recv st
+       . Agency role' ps '(recv, st)
       -> Msg role' ps st '(send, st') '(recv, st'')
       -> bytes
   , decode
       :: forall (recv :: role') (from :: ps)
-       . Agency role' ps recv from
-      -> m (DecodeStep bytes failure m (SomeMsg role' ps recv from))
+       . Agency role' ps '(recv, from)
+      -> m (DecodeStep bytes failure m (SomeMsg role' ps '(recv, from)))
   }
 
 data DecodeStep bytes failure m a

@@ -35,11 +35,21 @@ liftRecv
   -> Recv role' ps recv (ws a) rps
 liftRecv s = Recv $ liftMsg s
 
-data Agency role' ps r st where
-  Agency :: Sing (r :: role') -> Sing (st :: ps) -> Agency role' ps r st
+data Agency role' ps (rst :: (role', ps)) where
+  Agency
+    :: Sing (r :: role')
+    -> Sing (st :: ps)
+    -> Agency role' ps '(r, st)
 
-data SomeMsg role' ps recv from where
-  SomeMsg :: Recv role' ps recv from to -> SomeMsg role' ps recv from
+data SomeMsg role' ps (rts :: (role', ps)) where
+  SomeMsg
+    :: Recv role' ps (recv :: role') (from :: ps) (to :: ps)
+    -> SomeMsg role' ps '(recv, from)
+
+data AnyMsg role' ps where
+  AnyMsg
+    :: Msg role' ps st '(send, st') '(recv, st'')
+    -> AnyMsg role' ps
 
 data Peer role' ps (r :: role') (m :: Type -> Type) (ia :: ps -> Type) (st :: ps) where
   IReturn :: ia st -> Peer role' ps r m ia st

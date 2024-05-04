@@ -25,14 +25,14 @@ data Driver role' ps dstate m
   = Driver
   { sendMsg
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . Agency role' ps recv st
+       . Agency role' ps '(recv, st)
       -> Msg role' ps st '(send, st') '(recv, st'')
       -> m ()
   , recvMsg
       :: forall (recv :: role') (from :: ps)
-       . Agency role' ps recv from
+       . Agency role' ps '(recv, from)
       -> dstate
-      -> m (SomeMsg role' ps recv from, dstate)
+      -> m (SomeMsg role' ps '(recv, from), dstate)
   , startDState :: dstate
   }
 
@@ -60,11 +60,6 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     (SomeMsg msg, dstate') <- recvMsg (Agency (sing @r) (sing @st')) dstate
     go dstate' (k msg)
 
-data AnyMsg role' ps where
-  AnyMsg
-    :: Msg role' ps st '(send, st') '(recv, st'')
-    -> AnyMsg role' ps
-
 data TraceSendRecv role' ps where
   TraceSendMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
   TraceRecvMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
@@ -90,7 +85,7 @@ driverSimple tracer Codec{encode, decode} channel@Channel{sendFun} =
  where
   sendMsg
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
-     . Agency role' ps recv from
+     . Agency role' ps '(recv, from)
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
   sendMsg stok@(Agency srecv _) msg = do
@@ -100,9 +95,9 @@ driverSimple tracer Codec{encode, decode} channel@Channel{sendFun} =
   recvMsg
     :: forall (recv :: role') (from :: ps)
      . (Monad m, MonadIO m)
-    => Agency role' ps recv from
+    => Agency role' ps '(recv, from)
     -> Maybe bytes
-    -> m (SomeMsg role' ps recv from, Maybe bytes)
+    -> m (SomeMsg role' ps '(recv, from), Maybe bytes)
   recvMsg stok trailing = do
     decoder <- decode stok
     result <- runDecoderWithChannel channel trailing decoder

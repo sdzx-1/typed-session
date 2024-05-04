@@ -174,13 +174,13 @@ codecRoleBookSt = Codec{encode, decode}
   encode _ = AnyMsg
   decode
     :: forall (r :: Role) (from :: BookSt)
-     . Agency Role BookSt r from
+     . Agency Role BookSt '(r, from)
     -> m
         ( DecodeStep
             (AnyMsg Role BookSt)
             CodecFailure
             m
-            (SomeMsg Role BookSt r from)
+            (SomeMsg Role BookSt '(r, from))
         )
   decode stok =
     pure $ DecodePartial $ \mb ->
