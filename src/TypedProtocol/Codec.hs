@@ -7,25 +7,26 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module TypedProtocol.Codec where
 
 import Control.Exception (Exception)
-import Data.IFunctor (Sing)
+import Data.Dependent.Map (DMap)
+import Data.IFunctor (Any, Sing)
 import TypedProtocol.Core
 
-data Codec role' ps failure m bytes = Codec
+newtype Encode role' ps bytes = Encode
   { encode
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . Agency role' ps '(recv, st)
-      -> Msg role' ps st '(send, st') '(recv, st'')
+       . Msg role' ps st '(send, st') '(recv, st'')
       -> bytes
-  , decode
-      :: forall (recv :: role') (from :: ps)
-       . Agency role' ps '(recv, from)
-      -> m (DecodeStep bytes failure m (SomeMsg role' ps '(recv, from)))
+  }
+
+newtype Decode role' ps failure m bytes = Decode
+  { decode :: DecodeStep bytes failure m (AnyMsg role' ps)
   }
 
 data DecodeStep bytes failure m a
@@ -50,14 +51,16 @@ runDecoder _ (DecodeFail failure) = return (Left failure)
 runDecoder [] (DecodePartial k) = k Nothing >>= runDecoder []
 runDecoder (b : bs) (DecodePartial k) = k (Just b) >>= runDecoder bs
 
-data Channel role' m a = Channel
-  { sendFun :: forall r. Sing (r :: role') -> a -> m ()
+data Channel m a = Channel
+  { send :: a -> m ()
   , recv :: m (Maybe a)
   }
 
+type RoleSend role' m a = DMap (Sing @role') (Any (a -> m ()))
+
 runDecoderWithChannel
   :: (Monad m)
-  => Channel role' m bytes
+  => Channel m bytes
   -> Maybe bytes
   -> DecodeStep bytes failure m a
   -> m (Either failure (a, Maybe bytes))

@@ -13,52 +13,58 @@
 
 module TypedProtocol.Driver where
 
-import Control.Exception (throwIO)
-import Control.Monad.IO.Class (MonadIO, liftIO)
-import Data.IFunctor (At (..), SingI (sing))
+import Control.Concurrent.Class.MonadSTM
+import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
+import qualified Data.Dependent.Map as D
+import Data.GADT.Compare (GCompare)
+import Data.IFunctor (Any (..), At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
 import GHC.Exception (Exception)
 import TypedProtocol.Codec
 import TypedProtocol.Core
+import Unsafe.Coerce (unsafeCoerce)
 
-data Driver role' ps dstate m
+data Driver role' ps m
   = Driver
   { sendMsg
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . Agency role' ps '(recv, st)
+       . (SingI recv, SingI st, GCompare (Sing @ps), GCompare (Sing @role'))
+      => Sing recv
       -> Msg role' ps st '(send, st') '(recv, st'')
       -> m ()
   , recvMsg
-      :: forall (recv :: role') (from :: ps)
-       . Agency role' ps '(recv, from)
-      -> dstate
-      -> m (SomeMsg role' ps '(recv, from), dstate)
-  , startDState :: dstate
+      :: TVar m (AgencyMsg role' ps)
   }
 
 runPeerWithDriver
-  :: forall role' ps (r :: role') (st :: ps) dstate m a
-   . (Monad m)
-  => Driver role' ps dstate m
+  :: forall role' ps (r :: role') (st :: ps) m a
+   . ( Monad m
+     , MonadSTM m
+     , GCompare (Sing @role')
+     )
+  => Driver role' ps m
   -> Peer role' ps r m (At a (Done r)) st
-  -> dstate
-  -> m (a, dstate)
+  -> m a
 runPeerWithDriver Driver{sendMsg, recvMsg} =
-  flip go
+  go
  where
   go
     :: forall st'
-     . dstate
-    -> Peer role' ps r m (At a (Done r)) st'
-    -> m (a, dstate)
-  go dstate (IReturn (At a)) = pure (a, dstate)
-  go dstate (LiftM k) = k >>= go dstate
-  go dstate (Yield (msg :: Msg role' ps (st' :: ps) '(r, sps) '(recv :: role', rps)) k) = do
-    sendMsg (Agency (sing @recv) (sing @st')) msg
-    go dstate k
-  go dstate (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
-    (SomeMsg msg, dstate') <- recvMsg (Agency (sing @r) (sing @st')) dstate
-    go dstate' (k msg)
+     . Peer role' ps r m (At a (Done r)) st'
+    -> m a
+  go (IReturn (At a)) = pure a
+  go (LiftM k) = k >>= go
+  go (Yield (msg :: Msg role' ps (st' :: ps) '(r, sps) '(recv :: role', rps)) k) = do
+    sendMsg (sing @recv) msg
+    go k
+  go (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
+    SomeMsg recv <- atomically $ do
+      agencyMsg <- readTVar recvMsg
+      maybe
+        retry
+        pure
+        (D.lookup (sing @st') agencyMsg)
+    go (k $ unsafeCoerce recv)
 
 data TraceSendRecv role' ps where
   TraceSendMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
@@ -74,35 +80,50 @@ nullTracer :: (Monad m) => a -> m ()
 nullTracer _ = pure ()
 
 driverSimple
-  :: forall role' ps failure bytes m
-   . (Monad m, MonadIO m, Exception failure, Ord role')
+  :: forall role' ps bytes m
+   . (Monad m, Ord role')
   => Tracer role' ps m
-  -> Codec role' ps failure m bytes
-  -> Channel role' m bytes
-  -> Driver role' ps (Maybe bytes) m
-driverSimple tracer Codec{encode, decode} channel@Channel{sendFun} =
-  Driver{sendMsg, recvMsg, startDState = Nothing}
+  -> Encode role' ps bytes
+  -> RoleSend role' m bytes
+  -> TVar m (AgencyMsg role' ps)
+  -> Driver role' ps m
+driverSimple tracer Encode{encode} roleChannel tvar =
+  Driver{sendMsg, recvMsg = tvar}
  where
   sendMsg
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
-     . Agency role' ps '(recv, from)
+     . ( SingI recv
+       , SingI from
+       , GCompare (Sing @ps)
+       , GCompare (Sing @role')
+       )
+    => Sing recv
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
-  sendMsg stok@(Agency srecv _) msg = do
-    sendFun srecv (encode stok msg)
+  sendMsg srecv msg = do
+    case D.lookup srecv roleChannel of
+      Nothing -> error "np"
+      Just (Any sendFun) -> sendFun (encode msg)
     tracer (TraceSendMsg (AnyMsg msg))
 
-  recvMsg
-    :: forall (recv :: role') (from :: ps)
-     . (Monad m, MonadIO m)
-    => Agency role' ps '(recv, from)
-    -> Maybe bytes
-    -> m (SomeMsg role' ps '(recv, from), Maybe bytes)
-  recvMsg stok trailing = do
-    decoder <- decode stok
-    result <- runDecoderWithChannel channel trailing decoder
-    case result of
-      Right x@(SomeMsg (Recv msg), _) -> do
-        tracer (TraceRecvMsg (AnyMsg msg))
-        pure x
-      Left failure -> liftIO $ throwIO failure
+decodeLoop
+  :: (Exception failure, MonadSTM m, MonadThrow m)
+  => Tracer role' ps m
+  -> Maybe bytes
+  -> Decode role' ps failure m bytes
+  -> Channel m bytes
+  -> TVar m (AgencyMsg role' ps)
+  -> m ()
+decodeLoop tracer mbt d@Decode{decode} channel tvar = do
+  result <- runDecoderWithChannel channel mbt decode
+  case result of
+    Right (anyMsg@(AnyMsg msg), mbt') -> do
+      tracer (TraceRecvMsg anyMsg)
+      let agency = msgFromStSing msg
+      atomically $ do
+        agencyMsg <- readTVar tvar
+        case D.lookup agency agencyMsg of
+          Nothing -> writeTVar tvar (D.insert agency (SomeMsg (Recv msg)) agencyMsg)
+          Just _v -> retry
+      decodeLoop tracer mbt' d channel tvar
+    Left failure -> throwIO failure
