@@ -7,15 +7,13 @@
 {-# LANGUAGE QuantifiedConstraints #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
 module TypedProtocol.Codec where
 
 import Control.Exception (Exception)
-import Data.Dependent.Map (DMap)
-import Data.IFunctor (Any, Sing)
+import Data.IntMap (IntMap)
 import TypedProtocol.Core
 
 newtype Encode role' ps bytes = Encode
@@ -56,7 +54,7 @@ data Channel m a = Channel
   , recv :: m (Maybe a)
   }
 
-type SendToRole role' m a = DMap (Sing @role') (Any (a -> m ()))
+type SendToRole role' m a = IntMap (a -> m ())
 
 runDecoderWithChannel
   :: (Monad m)

@@ -4,13 +4,13 @@
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE LambdaCase #-}
+{-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QualifiedDo #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 
@@ -21,18 +21,15 @@ import Control.Monad
 import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadThrow (MonadThrow)
-import qualified Data.Dependent.Map as D
-import Data.Dependent.Sum
-import Data.GADT.Compare (GCompare (..), GEq (..), GOrdering (..))
-import Data.GADT.Compare.TH
-import Data.IFunctor (Any (..), At (..), Sing, SingI, ireturn, returnAt)
+import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
+import qualified Data.IntMap as IntMap
 import Data.Kind
-import Type.Reflection
+import GHC.Exts (dataToTag#)
+import GHC.Int (Int (I#))
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
-import Unsafe.Coerce (unsafeCoerce)
 
 {-
 
@@ -87,9 +84,6 @@ data SRole :: Role -> Type where
   SBuyer2 :: SRole Buyer2
   SSeller :: SRole Seller
 
-deriveGEq ''SRole
-deriveGCompare ''SRole
-
 type instance Sing = SRole
 
 instance SingI Buyer where
@@ -129,43 +123,6 @@ data SBookSt :: BookSt -> Type where
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
 
-instance GEq SBookSt where
-  geq SS0 SS0 = do return Refl
-  geq SS1 SS1 = do return $ unsafeCoerce Refl
-  geq SS11 SS11 = do return $ unsafeCoerce Refl
-  geq SS110 SS110 = do return Refl
-  geq SS113 SS113 = do return $ unsafeCoerce Refl
-  geq SS12 SS12 = do return $ unsafeCoerce Refl
-  geq SS3 SS3 = do return Refl
-  geq SEnd SEnd = do return Refl
-  geq _ _ = Nothing
-
-instance GCompare SBookSt where
-  gcompare SS0 SS0 = runGComparing (do return GEQ)
-  gcompare SS0{} _ = GLT
-  gcompare _ SS0{} = GGT
-  gcompare SS1 SS1 = runGComparing (do return $ unsafeCoerce GEQ)
-  gcompare SS1{} _ = GLT
-  gcompare _ SS1{} = GGT
-  gcompare SS11 SS11 = runGComparing (do return $ unsafeCoerce GEQ)
-  gcompare SS11{} _ = GLT
-  gcompare _ SS11{} = GGT
-  gcompare SS110 SS110 = runGComparing (do return GEQ)
-  gcompare SS110{} _ = GLT
-  gcompare _ SS110{} = GGT
-  gcompare SS113 SS113 = runGComparing (do return $ unsafeCoerce GEQ)
-  gcompare SS113{} _ = GLT
-  gcompare _ SS113{} = GGT
-  gcompare SS12 SS12 = runGComparing (do return $ unsafeCoerce GEQ)
-  gcompare SS12{} _ = GLT
-  gcompare _ SS12{} = GGT
-  gcompare SS3 SS3 = runGComparing (do return GEQ)
-  gcompare SS3{} _ = GLT
-  gcompare _ SS3{} = GGT
-  gcompare SEnd SEnd = runGComparing (do return GEQ)
-  gcompare SEnd{} _ = GLT
-  gcompare _ SEnd{} = GGT
-
 type instance Sing = SBookSt
 
 instance SingI S0 where
@@ -193,6 +150,12 @@ instance SingI End where
   sing = SEnd
 
 type Date = Int
+
+instance SingToInt Role where
+  singToInt x = I# (dataToTag# x)
+
+instance SingToInt BookSt where
+  singToInt x = I# (dataToTag# x)
 
 instance Protocol Role BookSt where
   type Done Buyer = End
@@ -353,14 +316,14 @@ runAll = do
 
       sendFun bufferWrite x = atomically (putTMVar bufferWrite x)
       sendToRole =
-        D.fromList
-          [ SSeller :=> Any (sendFun sellerTMVar)
-          , SBuyer :=> Any (sendFun buyerTMVar)
-          , SBuyer2 :=> Any (sendFun buyer2TMVar)
+        IntMap.fromList
+          [ (singToInt SSeller, sendFun sellerTMVar)
+          , (singToInt SBuyer, sendFun buyerTMVar)
+          , (singToInt SBuyer2, sendFun buyer2TMVar)
           ]
-  buyerTvar <- newTVarIO D.empty
-  buyer2Tvar <- newTVarIO D.empty
-  sellerTvar <- newTVarIO D.empty
+  buyerTvar <- newTVarIO IntMap.empty
+  buyer2Tvar <- newTVarIO IntMap.empty
+  sellerTvar <- newTVarIO IntMap.empty
   let buyerDriver = driverSimple (myTracer "buyer") encodeMsg sendToRole buyerTvar
       buyer2Driver = driverSimple (myTracer "buyer2") encodeMsg sendToRole buyer2Tvar
       sellerDriver = driverSimple (myTracer "seller") encodeMsg sendToRole sellerTvar

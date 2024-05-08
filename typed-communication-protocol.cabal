@@ -72,9 +72,7 @@ library
     -- Other library packages from which modules are imported.
     build-depends: base >=4.17.0.0
                  , io-classes
-                 , dependent-map
-                 , dependent-sum
-                 , dependent-sum-template
+                 , containers
 
     -- Directories containing source files.
     hs-source-dirs:   src
@@ -111,9 +109,6 @@ test-suite typed-communication-protocol-test
     build-depends:
         base >=4.17.0.0,
         typed-communication-protocol,
-        stm,
-        dependent-map,
-        dependent-sum,
-        dependent-sum-template,
+        containers,
         io-classes,
         io-sim

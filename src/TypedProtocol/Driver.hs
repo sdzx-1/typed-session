@@ -15,10 +15,9 @@ module TypedProtocol.Driver where
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
-import qualified Data.Dependent.Map as D
-import Data.GADT.Compare (GCompare)
-import Data.IFunctor (Any (..), At (..), Sing, SingI (sing))
+import Data.IFunctor (At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
+import qualified Data.IntMap as IntMap
 import GHC.Exception (Exception)
 import TypedProtocol.Codec
 import TypedProtocol.Core
@@ -28,7 +27,11 @@ data Driver role' ps m
   = Driver
   { sendMsg
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . (SingI recv, SingI st, GCompare (Sing @ps), GCompare (Sing @role'))
+       . ( SingI recv
+         , SingI st
+         , SingToInt ps
+         , SingToInt role'
+         )
       => Sing recv
       -> Msg role' ps st '(send, st') '(recv, st'')
       -> m ()
@@ -40,7 +43,7 @@ runPeerWithDriver
   :: forall role' ps (r :: role') (st :: ps) m a
    . ( Monad m
      , MonadSTM m
-     , GCompare (Sing @role')
+     , (SingToInt role')
      )
   => Driver role' ps m
   -> Peer role' ps r m (At a (Done r)) st
@@ -58,15 +61,15 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     sendMsg (sing @recv) msg
     go k
   go (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
-    let singVal = sing @st'
-    SomeMsg recv <- atomically $ do
+    let singInt = singToInt $ sing @st'
+    AnyMsg msg <- atomically $ do
       agencyMsg <- readTVar recvMsg
-      case D.lookup singVal agencyMsg of
+      case IntMap.lookup singInt agencyMsg of
         Nothing -> retry
         Just v -> do
-          writeTVar recvMsg (D.delete singVal agencyMsg)
+          writeTVar recvMsg (IntMap.delete singInt agencyMsg)
           pure v
-    go (k $ unsafeCoerce recv)
+    go (k $ unsafeCoerce (Recv msg))
 
 data TraceSendRecv role' ps where
   TraceSendMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
@@ -96,16 +99,16 @@ driverSimple tracer Encode{encode} sendToRole tvar =
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
      . ( SingI recv
        , SingI from
-       , GCompare (Sing @ps)
-       , GCompare (Sing @role')
+       , SingToInt ps
+       , SingToInt role'
        )
     => Sing recv
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
   sendMsg role msg = do
-    case D.lookup role sendToRole of
+    case IntMap.lookup (singToInt role) sendToRole of
       Nothing -> error "np"
-      Just (Any sendFun) -> sendFun (encode msg)
+      Just sendFun -> sendFun (encode msg)
     tracer (TraceSendMsg (AnyMsg msg))
 
 decodeLoop
@@ -121,11 +124,11 @@ decodeLoop tracer mbt d@Decode{decode} channel tvar = do
   case result of
     Right (anyMsg@(AnyMsg msg), mbt') -> do
       tracer (TraceRecvMsg anyMsg)
-      let agency = msgFromStSing msg
+      let agencyInt = singToInt $ msgFromStSing msg
       atomically $ do
         agencyMsg <- readTVar tvar
-        case D.lookup agency agencyMsg of
-          Nothing -> writeTVar tvar (D.insert agency (SomeMsg (Recv msg)) agencyMsg)
+        case IntMap.lookup agencyInt agencyMsg of
+          Nothing -> writeTVar tvar (IntMap.insert agencyInt (AnyMsg msg) agencyMsg)
           Just _v -> retry
       decodeLoop tracer mbt' d channel tvar
     Left failure -> throwIO failure

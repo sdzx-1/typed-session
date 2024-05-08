@@ -16,8 +16,6 @@ type SingI :: forall {k}. k -> Constraint
 class SingI a where
   sing :: Sing a
 
-newtype Any a ix = Any a
-
 infixr 0 ~>
 
 type f ~> g = forall x. f x -> g x
