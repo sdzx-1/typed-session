@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
@@ -10,12 +11,8 @@
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TemplateHaskell #-}
-{-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_GHC -Wno-unrecognised-pragmas #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Book where
 
@@ -170,10 +167,9 @@ decodeMsg
       m
       (AnyMsg Role BookSt)
 decodeMsg =
-  DecodePartial $ \mb ->
-    case mb of
-      Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-      Just anyMsg -> pure $ DecodeDone anyMsg Nothing
+  DecodePartial $ \case
+    Nothing -> return $ DecodeFail (CodecFailure "expected more data")
+    Just anyMsg -> pure $ DecodeDone anyMsg Nothing
 
 budget :: Int
 budget = 100
