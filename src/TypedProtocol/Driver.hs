@@ -84,10 +84,10 @@ driverSimple
    . (Monad m, Ord role')
   => Tracer role' ps m
   -> Encode role' ps bytes
-  -> RoleSend role' m bytes
+  -> SendToRole role' m bytes
   -> TVar m (AgencyMsg role' ps)
   -> Driver role' ps m
-driverSimple tracer Encode{encode} roleChannel tvar =
+driverSimple tracer Encode{encode} sendToRole tvar =
   Driver{sendMsg, recvMsg = tvar}
  where
   sendMsg
@@ -100,8 +100,8 @@ driverSimple tracer Encode{encode} roleChannel tvar =
     => Sing recv
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
-  sendMsg srecv msg = do
-    case D.lookup srecv roleChannel of
+  sendMsg role msg = do
+    case D.lookup role sendToRole of
       Nothing -> error "np"
       Just (Any sendFun) -> sendFun (encode msg)
     tracer (TraceSendMsg (AnyMsg msg))

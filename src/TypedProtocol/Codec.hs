@@ -56,7 +56,7 @@ data Channel m a = Channel
   , recv :: m (Maybe a)
   }
 
-type RoleSend role' m a = DMap (Sing @role') (Any (a -> m ()))
+type SendToRole role' m a = DMap (Sing @role') (Any (a -> m ()))
 
 runDecoderWithChannel
   :: (Monad m)

@@ -242,15 +242,16 @@ runAll = do
   sellerTMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)
   let buyerChannel = mvarsAsChannel @m buyerTMVar sellerTMVar
       sellerChannel = mvarsAsChannel @m sellerTMVar buyerTMVar
-      roleSend =
+      sendFun bufferWrite x = atomically (putTMVar bufferWrite x)
+      sendToRole =
         D.fromList
-          [ SSeller :=> Any (send buyerChannel)
-          , SBuyer :=> Any (send sellerChannel)
+          [ SSeller :=> Any (sendFun sellerTMVar)
+          , SBuyer :=> Any (sendFun buyerTMVar)
           ]
   buyerTvar <- newTVarIO D.empty
   sellerTvar <- newTVarIO D.empty
-  let buyerDriver = driverSimple (myTracer "buyer") encodeMsg roleSend buyerTvar
-      sellerDriver = driverSimple (myTracer "seller") encodeMsg roleSend sellerTvar
+  let buyerDriver = driverSimple (myTracer "buyer") encodeMsg sendToRole buyerTvar
+      sellerDriver = driverSimple (myTracer "seller") encodeMsg sendToRole sellerTvar
   -- fork buyer decode thread, seller -> buyer
   forkIO $ decodeLoop (myTracer "buyer") Nothing (Decode decodeMsg) buyerChannel buyerTvar
   -- fork seller decode thread, buyer -> seller
