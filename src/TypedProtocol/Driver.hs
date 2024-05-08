@@ -58,12 +58,14 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     sendMsg (sing @recv) msg
     go k
   go (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
+    let singVal = sing @st'
     SomeMsg recv <- atomically $ do
       agencyMsg <- readTVar recvMsg
-      maybe
-        retry
-        pure
-        (D.lookup (sing @st') agencyMsg)
+      case D.lookup singVal agencyMsg of
+        Nothing -> retry
+        Just v -> do
+          writeTVar recvMsg (D.delete singVal agencyMsg)
+          pure v
     go (k $ unsafeCoerce recv)
 
 data TraceSendRecv role' ps where
