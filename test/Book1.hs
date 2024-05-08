@@ -3,12 +3,14 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE FlexibleInstances #-}
 {-# LANGUAGE GADTs #-}
+{-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
 {-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QualifiedDo #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
+{-# LANGUAGE TemplateHaskell #-}
 {-# HLINT ignore "Use lambda-case" #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
@@ -18,15 +20,23 @@
 
 module Book1 where
 
-import Control.Concurrent (forkIO)
-import Control.Concurrent.STM
+import Control.Concurrent.Class.MonadSTM
 import Control.Monad
-import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
+import Control.Monad.Class.MonadFork (MonadFork, forkIO)
+import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadThrow (MonadThrow)
+import qualified Data.Dependent.Map as D
+import Data.Dependent.Sum
+import Data.GADT.Compare (GCompare (..), GEq (..), GOrdering (..))
+import Data.GADT.Compare.TH
+import Data.IFunctor (Any (..), At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
+import Type.Reflection
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
+import Unsafe.Coerce (unsafeCoerce)
 
 {-
 
@@ -65,6 +75,9 @@ data SRole :: Role -> Type where
   SBuyer2 :: SRole Buyer2
   SSeller :: SRole Seller
 
+deriveGEq ''SRole
+deriveGCompare ''SRole
+
 type instance Sing = SRole
 
 instance SingI Buyer where
@@ -97,6 +110,39 @@ data SBookSt :: BookSt -> Type where
   SS12 :: SBookSt (S12 (s :: BudgetSt))
   SS3 :: SBookSt S3
   SEnd :: SBookSt End
+
+instance GEq SBookSt where
+  geq SS0 SS0 = do return Refl
+  geq SS1 SS1 = do return Refl
+  geq SS11 SS11 = do return Refl
+  geq SS110 SS110 = do return Refl
+  geq SS12 SS12 = do return $ unsafeCoerce Refl
+  geq SS3 SS3 = do return Refl
+  geq SEnd SEnd = do return Refl
+  geq _ _ = Nothing
+
+instance GCompare SBookSt where
+  gcompare SS0 SS0 = runGComparing (do return GEQ)
+  gcompare SS0{} _ = GLT
+  gcompare _ SS0{} = GGT
+  gcompare SS1 SS1 = runGComparing (do return GEQ)
+  gcompare SS1{} _ = GLT
+  gcompare _ SS1{} = GGT
+  gcompare SS11 SS11 = runGComparing (do return GEQ)
+  gcompare SS11{} _ = GLT
+  gcompare _ SS11{} = GGT
+  gcompare SS110 SS110 = runGComparing (do return GEQ)
+  gcompare SS110{} _ = GLT
+  gcompare _ SS110{} = GGT
+  gcompare SS12 SS12 = runGComparing (do return $ unsafeCoerce GEQ)
+  gcompare SS12{} _ = GLT
+  gcompare _ SS12{} = GGT
+  gcompare SS3 SS3 = runGComparing (do return GEQ)
+  gcompare SS3{} _ = GLT
+  gcompare _ SS3{} = GGT
+  gcompare SEnd SEnd = runGComparing (do return GEQ)
+  gcompare SEnd{} _ = GLT
+  gcompare _ SEnd{} = GGT
 
 type instance Sing = SBookSt
 
@@ -136,37 +182,28 @@ instance Protocol Role BookSt where
     Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, End)
     NotBuy :: Msg Role BookSt (S12 NotEnoughBuget) '(Buyer, End) '(Seller, End)
 
-codecRoleBookSt
+encodeMsg :: Encode Role BookSt (AnyMsg Role BookSt)
+encodeMsg = Encode $ \x -> case x of
+  Title{} -> AnyMsg x
+  Price{} -> AnyMsg x
+  PriceToB2{} -> AnyMsg x
+  HalfPrice{} -> AnyMsg x
+  Afford{} -> AnyMsg x
+  Date{} -> AnyMsg x
+  NotBuy{} -> AnyMsg x
+
+decodeMsg
   :: forall m
    . (Monad m)
-  => Codec Role BookSt CodecFailure m (AnyMsg Role BookSt)
-codecRoleBookSt = Codec{encode, decode}
- where
-  encode _ = AnyMsg
-  decode
-    :: forall (r :: Role) (from :: BookSt)
-     . Agency Role BookSt '(r, from)
-    -> m
-        ( DecodeStep
-            (AnyMsg Role BookSt)
-            CodecFailure
-            m
-            (SomeMsg Role BookSt '(r, from))
-        )
-  decode stok =
-    pure $ DecodePartial $ \mb ->
-      case mb of
-        Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-        Just (AnyMsg msg) -> return $
-          case (stok, msg) of
-            (Agency SBuyer SS1, Price{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SBuyer SS110, HalfPrice{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SBuyer SS3, Date{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS0, Title{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            (Agency SSeller SS12, Afford{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
-            (Agency SSeller SS12, NotBuy{}) -> DecodeDone (SomeMsg (liftRecv msg)) Nothing
-            (Agency SBuyer2 SS11, PriceToB2{}) -> DecodeDone (SomeMsg (Recv msg)) Nothing
-            _ -> error "np"
+  => DecodeStep
+      (AnyMsg Role BookSt)
+      CodecFailure
+      m
+      (AnyMsg Role BookSt)
+decodeMsg =
+  DecodePartial $ \case
+    Nothing -> return $ DecodeFail (CodecFailure "expected more data")
+    Just anyMsg -> pure $ DecodeDone anyMsg Nothing
 
 budget :: Int
 budget = 16
@@ -175,14 +212,14 @@ data CheckPriceResult :: BookSt -> Type where
   Yes :: CheckPriceResult (S12 EnoughBudget)
   No :: CheckPriceResult (S12 NotEnoughBuget)
 
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult (S12 s)
+checkPrice :: (Monad m) => Int -> Int -> Peer Role BookSt Buyer m CheckPriceResult (S12 s)
 checkPrice i h =
   if i <= budget + h
     then LiftM $ pure (ireturn Yes)
     else LiftM $ pure (ireturn No)
 
 buyerPeer
-  :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
+  :: (Monad m) => Peer Role BookSt Buyer m (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
   yield (Title "haskell book")
   Recv (Price i) <- await
@@ -198,39 +235,34 @@ buyerPeer = I.do
       yield NotBuy
       returnAt Nothing
 
-buyerPeer2
-  :: Peer Role BookSt Buyer2 IO (At () (Done Buyer2)) S11
-buyerPeer2 = I.do
+buyer2Peer
+  :: (Monad m) => Peer Role BookSt Buyer2 m (At () (Done Buyer2)) S11
+buyer2Peer = I.do
   Recv (PriceToB2 i) <- await
   yield (HalfPrice (i `div` 2))
 
-sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
+sellerPeer :: (Monad m) => Peer Role BookSt Seller m (At () (Done Seller)) S0
 sellerPeer = I.do
   Recv (Title _name) <- await
   yield (Price 30)
   Recv msg <- await
   case msg of
-    Afford -> I.do
-      yield (Date 100)
-    NotBuy -> I.do
-      returnAt ()
-
-newTMV :: s -> IO (s, TMVar a)
-newTMV s = do
-  ntmv <- newEmptyTMVarIO
-  pure (s, ntmv)
+    Afford -> yield (Date 100)
+    NotBuy -> returnAt ()
 
 mvarsAsChannel
-  :: TMVar a
-  -> (forall r. Sing (r :: role') -> (a -> IO ()))
-  -> Channel role' IO a
-mvarsAsChannel bufferRead sendFun =
-  Channel{sendFun, recv}
+  :: (MonadSTM m)
+  => TMVar m a
+  -> TMVar m a
+  -> Channel m a
+mvarsAsChannel bufferRead bufferWrite =
+  Channel{send, recv}
  where
+  send x = atomically (putTMVar bufferWrite x)
   recv = atomically (Just <$> takeTMVar bufferRead)
 
-myTracer :: String -> Tracer Role BookSt IO
-myTracer st v = putStrLn (st <> show v)
+myTracer :: (MonadSay m) => String -> Tracer Role BookSt m
+myTracer st v = say (st <> show v)
 
 instance Show (AnyMsg Role BookSt) where
   show (AnyMsg msg) = case msg of
@@ -242,27 +274,46 @@ instance Show (AnyMsg Role BookSt) where
     Date i -> "Date " <> show i
     NotBuy -> "NotBuy"
 
-runAll :: IO ()
+runAll :: forall m. (Monad m, MonadSTM m, MonadSay m, MonadFork m, MonadThrow m) => m ()
 runAll = do
-  buyerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
-  buyer2TMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @(AnyMsg Role BookSt)
+  buyerTMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)
+  buyer2TMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)
+  let buyerSellerChannel = mvarsAsChannel @m buyerTMVar sellerTMVar
+      buyerBuyer2Channel = mvarsAsChannel @m buyerTMVar buyer2TMVar
 
-  let sendFun :: forall r. Sing (r :: Role) -> AnyMsg Role BookSt -> IO ()
-      sendFun sr a = case sr of
-        SBuyer -> atomically $ putTMVar buyerTMVar a
-        SBuyer2 -> atomically $ putTMVar buyer2TMVar a
-        SSeller -> atomically $ putTMVar sellerTMVar a
+      sellerBuyerChannel = mvarsAsChannel @m sellerTMVar buyerTMVar
 
-  let chanSeller = mvarsAsChannel sellerTMVar sendFun
-      chanBuyer2 = mvarsAsChannel buyer2TMVar sendFun
-      chanBuyer = mvarsAsChannel buyerTMVar sendFun
+      buyer2BuyerChannel = mvarsAsChannel @m buyer2TMVar buyerTMVar
 
-  forkIO $ void $ do
-    runPeerWithDriver (driverSimple (myTracer "Seller: ") codecRoleBookSt chanSeller) sellerPeer Nothing
+      sendFun bufferWrite x = atomically (putTMVar bufferWrite x)
+      sendToRole =
+        D.fromList
+          [ SSeller :=> Any (sendFun sellerTMVar)
+          , SBuyer :=> Any (sendFun buyerTMVar)
+          , SBuyer2 :=> Any (sendFun buyer2TMVar)
+          ]
+  buyerTvar <- newTVarIO D.empty
+  buyer2Tvar <- newTVarIO D.empty
+  sellerTvar <- newTVarIO D.empty
+  let buyerDriver = driverSimple (myTracer "buyer") encodeMsg sendToRole buyerTvar
+      buyer2Driver = driverSimple (myTracer "buyer2") encodeMsg sendToRole buyer2Tvar
+      sellerDriver = driverSimple (myTracer "seller") encodeMsg sendToRole sellerTvar
+  -- fork buyer decode thread, seller -> buyer
+  forkIO $ decodeLoop (myTracer "buyer") Nothing (Decode decodeMsg) buyerSellerChannel buyerTvar
+  -- fork buyer decode thread, buyer2 -> buyer
+  forkIO $ decodeLoop (myTracer "buyer") Nothing (Decode decodeMsg) buyerBuyer2Channel buyerTvar
 
-  forkIO $ void $ do
-    runPeerWithDriver (driverSimple (myTracer "Buyer2: ") codecRoleBookSt chanBuyer2) buyerPeer2 Nothing
+  -- fork seller decode thread, buyer -> seller
+  forkIO $ decodeLoop (myTracer "seller") Nothing (Decode decodeMsg) sellerBuyerChannel sellerTvar
 
-  runPeerWithDriver (driverSimple (myTracer "Buyer: ") codecRoleBookSt chanBuyer) buyerPeer Nothing
-  pure ()
+  -- fork buyer2 decode thread, buyer -> buyer2
+  forkIO $ decodeLoop (myTracer "buyer2") Nothing (Decode decodeMsg) buyer2BuyerChannel buyer2Tvar
+
+  -- fork seller Peer thread
+  forkIO $ void $ runPeerWithDriver sellerDriver sellerPeer
+
+  -- fork buyer2 Peer thread
+  forkIO $ void $ runPeerWithDriver buyer2Driver buyer2Peer
+  -- run buyer Peer
+  void $ runPeerWithDriver buyerDriver buyerPeer

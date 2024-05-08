@@ -92,7 +92,7 @@ test-suite typed-communication-protocol-test
 
     -- Modules included in this executable, other than Main.
     other-modules: Book
-                 -- , Book1
+                 , Book1
                  -- , Book2
 
     -- LANGUAGE extensions used by modules in this package.
