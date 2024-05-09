@@ -92,6 +92,7 @@ test-suite typed-communication-protocol-test
     other-modules: Book
                  , Book1
                  , Book2
+                 , PingPong
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:
@@ -112,3 +113,4 @@ test-suite typed-communication-protocol-test
         containers,
         io-classes,
         io-sim
+    ghc-options:  -Werror=inaccessible-code -threaded
