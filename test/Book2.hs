@@ -33,47 +33,43 @@ import TypedProtocol.Driver
 
 {-
 
------------------------------------------------------------------------------------------------
-    Buyer                                                      Seller                  Buyer2
-    :S0                                                        :S0                      :S11 s
-     <                     Title String  ->                     >
-    :S1 s                                                      :S1 s
+-----------------Buyer---------------Seller--------------Buyer2-----------------
+                   S0                  S0                 S1 s
+       Title       |        --->       |
+                  S2 s                S2 s                S1 s
+    ------------------------------BookNotFound------------------------------
+                  S2 s          S2 BookNotFound           S1 s
+    BookNotFoun    |        <---       |
+            S1 BookNotFound           End                 S1 s
+  SellerNotFoundB  |                  --->                 |
+                  End                 End                 End
+                                    Terminal
 
- ------------------------------------------------------------------------------------------
- |  :S1 s                                                      :S1 BookNotFound
- |   <                     <-  BookNotFound                     >
- |  :S11 BookNotFound                                          :End                    :S11 s
- |   <                                  SellerNotFoundBook ->                            >
- |  :End                                                                               :End
- ------------------------------------------------------------------------------------------
+    -------------------------------BookFound--------------------------------
+                  S2 s            S2 BookFound            S1 s
+       Price       |        <---       |
+              S1 BookFound            S3 s                S1 s
+   PriceToBuyer2   |                  --->                 |
+                   S4                 S3 s                 S4
+     HalfPrice     |                  <---                 |
+                  S3 s                S3 s                S5 s
+        --------------------------EnoughBudget--------------------------
+            S3 EnoughBudget           S3 s                S5 s
+       Afford      |        --->       |
+                   S6                  S6                 S5 s
+        Data       |        <---       |
+            S5 EnoughBudget           End                 S5 s
+      Success      |                  --->                 |
+                  End                 End                 End
+                                    Terminal
 
- ------------------------------------------------------------------------------------------
- |  :S1 s                                                      :S1 BookFound
- |   <                     <-  Price Int                         >
- |  :S11 BookFound                                             :S12 s                  :S11 s
- |   <                                  PriceToBuyer2 Int ->                            >
- |  :S110                                                                              :S110
- |   <                                  <- HalfPrice  Int                               >
- |  :S12 s                                                                             :S113 s
- |
- | ----------------------------------------------------------------------------------------
- | |:S12  EnoughBudget                                         :S12 s
- | | <                  Afford ->                               >
- | |:S3                                                        :S3
- | | <                  <- Date Int                             >
- | | :S113 EnoughtBudget                                      :End                   :S113 s
- | | <                                 Success Int  ->                                  >
- | |:End                                                                              :End
- | ----------------------------------------------------------------------------------------
- |
- | ----------------------------------------------------------------------------------------
- | |:S12  NotEnoughBuget                                       :S12 s
- | | <                  NotBuy ->                               >
- | | S113 NotEnoughBuget                                      :End                  :S113 s
- | | <                                 Failed  ->                                       >
- | |:End                                                                             :End
- | ----------------------------------------------------------------------------------------
- ------------------------------------------------------------------------------------------
+        ------------------------NotEnoughBudget-------------------------
+           S3 NotEnoughBudget         S3 s                S5 s
+       NotBuy      |        --->       |
+           S5 NotEnoughBudget         End                 S5 s
+       Failed      |                  --->                 |
+                  End                 End                 End
+                                    Terminal
 -}
 
 data Role = Buyer | Seller | Buyer2
@@ -106,21 +102,21 @@ data BudgetSt
 data BookSt
   = S0
   | S1 FindBook
-  | S11 FindBook
-  | S110
-  | S113 BudgetSt
-  | S12 BudgetSt
-  | S3
+  | S2 FindBook
+  | S3 BudgetSt
+  | S4
+  | S5 BudgetSt
+  | S6
   | End
 
 data SBookSt :: BookSt -> Type where
   SS0 :: SBookSt S0
   SS1 :: SBookSt (S1 (s :: FindBook))
-  SS11 :: SBookSt (S11 (s :: FindBook))
-  SS110 :: SBookSt S110
-  SS113 :: SBookSt (S113 (s :: BudgetSt))
-  SS12 :: SBookSt (S12 (s :: BudgetSt))
-  SS3 :: SBookSt S3
+  SS2 :: SBookSt (S2 (s :: FindBook))
+  SS3 :: SBookSt (S3 (s :: BudgetSt))
+  SS4 :: SBookSt S4
+  SS5 :: SBookSt (S5 (s :: BudgetSt))
+  SS6 :: SBookSt S6
   SEnd :: SBookSt End
 
 type instance Sing = SBookSt
@@ -131,20 +127,20 @@ instance SingI S0 where
 instance SingI (S1 s) where
   sing = SS1
 
-instance SingI (S11 s) where
-  sing = SS11
+instance SingI (S2 s) where
+  sing = SS2
 
-instance SingI S110 where
-  sing = SS110
-
-instance SingI (S113 s) where
-  sing = SS113
-
-instance SingI (S12 s) where
-  sing = SS12
-
-instance SingI S3 where
+instance SingI (S3 s) where
   sing = SS3
+
+instance SingI S4 where
+  sing = SS4
+
+instance SingI (S5 s) where
+  sing = SS5
+
+instance SingI S6 where
+  sing = SS6
 
 instance SingI End where
   sing = SEnd
@@ -162,17 +158,17 @@ instance Protocol Role BookSt where
   type Done Seller = End
   type Done Buyer2 = End
   data Msg Role BookSt from send recv where
-    Title :: String -> Msg Role BookSt S0 '(Buyer, S1 s) '(Seller, S1 s)
-    Price :: Int -> Msg Role BookSt (S1 BookFound) '(Seller, S12 s) '(Buyer, S11 BookFound)
-    PriceToB2 :: Int -> Msg Role BookSt (S11 BookFound) '(Buyer, S110) '(Buyer2, S110)
-    HalfPrice :: Int -> Msg Role BookSt S110 '(Buyer2, S113 s) '(Buyer, S12 s)
-    Afford :: Msg Role BookSt (S12 EnoughBudget) '(Buyer, S3) '(Seller, S3)
-    Date :: Date -> Msg Role BookSt S3 '(Seller, End) '(Buyer, S113 EnoughBudget)
-    Success :: Int -> Msg Role BookSt (S113 EnoughBudget) '(Buyer, End) '(Buyer2, End)
-    NotBuy :: Msg Role BookSt (S12 NotEnoughBuget) '(Buyer, S113 NotEnoughBuget) '(Seller, End)
-    Failed :: Msg Role BookSt (S113 NotEnoughBuget) '(Buyer, End) '(Buyer2, End)
-    BookNotFoun :: Msg Role BookSt (S1 BookNotFound) '(Seller, End) '(Buyer, S11 BookNotFound)
-    SellerNotFoundBook :: Msg Role BookSt (S11 BookNotFound) '(Buyer, End) '(Buyer2, End)
+    Title :: String -> Msg Role BookSt S0 '(Buyer, S2 s) '(Seller, S2 s)
+    Price :: Int -> Msg Role BookSt (S2 BookFound) '(Seller, S3 s) '(Buyer, S1 BookFound)
+    PriceToB2 :: Int -> Msg Role BookSt (S1 BookFound) '(Buyer, S4) '(Buyer2, S4)
+    HalfPrice :: Int -> Msg Role BookSt S4 '(Buyer2, S5 s) '(Buyer, S3 s)
+    Afford :: Msg Role BookSt (S3 EnoughBudget) '(Buyer, S6) '(Seller, S6)
+    Date :: Date -> Msg Role BookSt S6 '(Seller, End) '(Buyer, S5 EnoughBudget)
+    Success :: Int -> Msg Role BookSt (S5 EnoughBudget) '(Buyer, End) '(Buyer2, End)
+    NotBuy :: Msg Role BookSt (S3 NotEnoughBuget) '(Buyer, S5 NotEnoughBuget) '(Seller, End)
+    Failed :: Msg Role BookSt (S5 NotEnoughBuget) '(Buyer, End) '(Buyer2, End)
+    BookNotFoun :: Msg Role BookSt (S2 BookNotFound) '(Seller, End) '(Buyer, S1 BookNotFound)
+    SellerNotFoundBook :: Msg Role BookSt (S1 BookNotFound) '(Buyer, End) '(Buyer2, End)
 
 encodeMsg :: Encode Role BookSt (AnyMsg Role BookSt)
 encodeMsg = Encode $ \x -> case x of
@@ -205,10 +201,10 @@ budget :: Int
 budget = 16
 
 data CheckPriceResult :: BookSt -> Type where
-  Yes :: CheckPriceResult (S12 EnoughBudget)
-  No :: CheckPriceResult (S12 NotEnoughBuget)
+  Yes :: CheckPriceResult (S3 EnoughBudget)
+  No :: CheckPriceResult (S3 NotEnoughBuget)
 
-checkPrice :: (Monad m) => Int -> Int -> Peer Role BookSt Buyer m CheckPriceResult (S12 s)
+checkPrice :: (Monad m) => Int -> Int -> Peer Role BookSt Buyer m CheckPriceResult (S3 s)
 checkPrice i h =
   if i <= budget + h
     then LiftM $ pure (ireturn Yes)
@@ -239,7 +235,7 @@ buyerPeer = I.do
           returnAt Nothing
 
 buyer2Peer
-  :: (Monad m) => Peer Role BookSt Buyer2 m (At () (Done Buyer2)) (S11 s)
+  :: (Monad m) => Peer Role BookSt Buyer2 m (At () (Done Buyer2)) (S1 s)
 buyer2Peer = I.do
   Recv msg' <- await
   case msg' of
@@ -252,10 +248,10 @@ buyer2Peer = I.do
         Failed -> returnAt ()
 
 data FindBookResult :: BookSt -> Type where
-  Found :: FindBookResult (S1 BookFound)
-  NotFound :: FindBookResult (S1 BookNotFound)
+  Found :: FindBookResult (S2 BookFound)
+  NotFound :: FindBookResult (S2 BookNotFound)
 
-findBook :: (Monad m) => String -> Peer Role BookSt Seller m FindBookResult (S1 s)
+findBook :: (Monad m) => String -> Peer Role BookSt Seller m FindBookResult (S2 s)
 findBook st =
   if st /= ""
     then LiftM $ pure (ireturn Found)
