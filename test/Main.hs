@@ -3,8 +3,8 @@ module Main (main) where
 import qualified Book
 import qualified Book1
 import qualified Book2
+import qualified Book3
 import qualified PingPong
-import Control.Concurrent (threadDelay)
 
 main :: IO ()
 main = do
@@ -14,6 +14,8 @@ main = do
   Book1.runAll
   putStrLn "---------------- run Book2 -----------------"
   Book2.runAll
+  putStrLn "---------------- run Book3 -----------------"
+  Book3.runAll
   putStrLn "---------------- run PingPong -----------------"
   PingPong.runAll
   putStrLn "--------------------------------------------"
