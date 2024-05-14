@@ -19,9 +19,8 @@ module Book3 where
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad
-import Control.Monad.Class.MonadFork (MonadFork, forkIO)
+import Control.Monad.Class.MonadFork (forkIO)
 import Control.Monad.Class.MonadSay
-import Control.Monad.Class.MonadThrow (MonadThrow)
 import Control.Monad.IO.Class (liftIO)
 import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
