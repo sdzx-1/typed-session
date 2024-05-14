@@ -251,3 +251,76 @@ and the buyer will notify buyer2 of various results.
 -}
 
 ```
+---------------------------------------------
+Here is the more and more complex book3. 
+
+In book3:
+- The seller checks whether the Title exists. 
+- The Buyer chooses whether he needs help from buyer2.
+- The Buyer2 chooses whether to support byer.
+- The Buyer will notify buyer2 of various results.
+
+```haskell
+---------------------------Buyer-------------------------Seller------------------------Buyer2---------------------------
+                             S0                            S0                          (S1 s)
+            Title            |            ----->           |
+                           (S2 s)                        (S2 s)                        (S1 s)
+    ---------------------------------------------------[NotFound]---------------------------------------------------
+                           (S2 s)                   (S2 [NotFound])                    (S1 s)
+            NoBook           |            <-----           |
+                      (S1 [NotFound])                     End                          (S1 s)
+         SellerNoBook        |                           ----->                          |
+                            End                           End                           End
+                                                        Terminal
+
+    ----------------------------------------------------[Found]-----------------------------------------------------
+                           (S2 s)                     (S2 [Found])                     (S1 s)
+            Price            |            <-----           |
+                           (S1 s)                        (S3 s)                        (S1 s)
+        ----------------------------------------------[One,Found]-----------------------------------------------
+                      (S1 [One,Found])                   (S3 s)                        (S1 s)
+          OneAfford          |                           ----->                          |
+                      (S3 [One,Found])                   (S3 s)                          S4
+          OneAccept          |            ----->           |
+                             S5                            S5                            S4
+           OneDate           |            <-----           |
+                             S4                           End                            S4
+          OneSuccess         |                           ----->                          |
+                            End                           End                           End
+                                                        Terminal
+
+        ----------------------------------------------[Two,Found]-----------------------------------------------
+                      (S1 [Two,Found])                   (S3 s)                        (S1 s)
+        PriceToBuyer2        |                           ----->                          |
+                           (S6 s)                        (S3 s)                        (S6 s)
+            -------------------------------------[NotSupport,Two,Found]-------------------------------------
+                           (S6 s)                        (S3 s)             (S6 [NotSupport,Two,Found])
+          NotSupport1        |                           <-----                          |
+                (S3 [NotSupport,Two,Found])              (S3 s)                         End
+          TwoNotBuy          |            ----->           |
+                            End                           End                           End
+                                                        Terminal
+
+            --------------------------------------[Support,Two,Found]---------------------------------------
+                           (S6 s)                        (S3 s)               (S6 [Support,Two,Found])
+          SupportVal         |                           <-----                          |
+                           (S3 s)                        (S3 s)                        (S7 s)
+                -------------------------------[Enough,Support,Two,Found]-------------------------------
+              (S3 [Enough,Support,Two,Found])            (S3 s)                        (S7 s)
+          TwoAccept          |            ----->           |
+                             S8                            S8                          (S7 s)
+           TwoDate           |            <-----           |
+              (S7 [Enough,Support,Two,Found])             End                          (S7 s)
+          TwoSuccess         |                           ----->                          |
+                            End                           End                           End
+                                                        Terminal
+
+                -----------------------------[NotEnough,Support,Two,Found]------------------------------
+             (S3 [NotEnough,Support,Two,Found])          (S3 s)                        (S7 s)
+          TwoNotBuy1         |            ----->           |
+             (S7 [NotEnough,Support,Two,Found])           End                          (S7 s)
+          TwoFailed          |                           ----->                          |
+                            End                           End                           End
+                                                        Terminal
+
+```
