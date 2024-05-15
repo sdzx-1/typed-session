@@ -6,32 +6,21 @@
 {-# LANGUAGE LambdaCase #-}
 {-# LANGUAGE MagicHash #-}
 {-# LANGUAGE MultiParamTypeClasses #-}
-{-# LANGUAGE NamedFieldPuns #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE QualifiedDo #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
-{-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
-{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
-module Book3 where
+module Book3.Type where
 
-import Control.Concurrent.Class.MonadSTM
-import Control.Monad
-import Control.Monad.Class.MonadFork (forkIO)
-import Control.Monad.Class.MonadSay
-import Control.Monad.IO.Class (liftIO)
-import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
+import Data.IFunctor (Sing, SingI)
 import qualified Data.IFunctor as I
-import qualified Data.IntMap as IntMap
 import Data.Kind
 import GHC.Exts (dataToTag#)
 import GHC.Int (Int (I#))
-import System.Random (randomIO)
 import TypedProtocol.Codec
 import TypedProtocol.Core
-import TypedProtocol.Driver
 
 {-
 ---------------------------Buyer-------------------------Seller------------------------Buyer2---------------------------
@@ -249,133 +238,6 @@ decodeMsg =
     Nothing -> return $ DecodeFail (CodecFailure "expected more data")
     Just anyMsg -> pure $ DecodeDone anyMsg Nothing
 
-budget :: Int
-budget = 16
-
-data CheckPriceResult :: BookSt -> Type where
-  Yes :: CheckPriceResult (S3 [Enough, Support, Two, Found])
-  No :: CheckPriceResult (S3 [NotEnough, Support, Two, Found])
-
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult (S3 s)
-checkPrice _i _h = I.do
-  At b <- liftm $ liftIO $ randomIO @Bool
-  if b
-    then LiftM $ pure (ireturn Yes)
-    else LiftM $ pure (ireturn No)
-
-data OT :: BookSt -> Type where
-  OTOne :: OT (S1 [One, Found])
-  OTTwo :: OT (S1 [Two, Found])
-
-choiceOT :: Int -> Peer Role BookSt Buyer IO OT (S1 s)
-choiceOT _i = I.do 
-  At b <- liftm $ liftIO $ randomIO @Bool
-  if b
-    then LiftM $ pure $ ireturn OTOne
-    else LiftM $ pure $ ireturn OTTwo
-
-buyerPeer
-  :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
-buyerPeer = I.do
-  yield (Title "haskell book")
-  await I.>>= \case
-    Recv NoBook -> I.do
-      yield SellerNoBook
-      returnAt Nothing
-    Recv (Price i) -> I.do
-      choiceOT i I.>>= \case
-        OTOne -> I.do
-          yield OneAfford
-          yield OneAccept
-          Recv (OneDate d) <- await
-          yield (OneSuccess d)
-          returnAt $ Just d
-        OTTwo -> I.do
-          yield (PriceToBuyer2 i)
-          await I.>>= \case
-            Recv NotSupport1 -> I.do
-              yield TwoNotBuy
-              returnAt Nothing
-            Recv (SupportVal h) -> I.do
-              checkPrice i h I.>>= \case
-                Yes -> I.do
-                  yield TwoAccept
-                  Recv (TwoDate d) <- await
-                  yield (TwoSuccess d)
-                  returnAt (Just d)
-                No -> I.do
-                  yield TwoNotBuy1
-                  yield TwoFailed
-                  returnAt Nothing
-
-data BuySupp :: BookSt -> Type where
-  BNS :: BuySupp (S6 '[NotSupport, Two, Found])
-  BS :: BuySupp (S6 '[Support, Two, Found])
-
-choiceB :: Int -> Peer Role BookSt Buyer2 IO BuySupp (S6 s)
-choiceB _i = I.do 
-  At b <- liftm $ liftIO $ randomIO @Bool
-  if b
-    then LiftM $ pure $ ireturn BNS
-    else LiftM $ pure $ ireturn BS
-
-buyer2Peer
-  :: Peer Role BookSt Buyer2 IO (At (Maybe Date) (Done Buyer2)) (S1 s)
-buyer2Peer = I.do
-  await I.>>= \case
-    Recv SellerNoBook -> returnAt Nothing
-    Recv OneAfford -> I.do
-      Recv (OneSuccess d) <- await
-      returnAt (Just d)
-    Recv (PriceToBuyer2 i) -> I.do
-      choiceB i I.>>= \case
-        BNS -> I.do
-          yield NotSupport1
-          returnAt Nothing
-        BS -> I.do
-          yield (SupportVal (i `div` 2))
-          await I.>>= \case
-            Recv (TwoSuccess d) -> returnAt $ Just d
-            Recv TwoFailed -> returnAt Nothing
-
-data FindBookResult :: BookSt -> Type where
-  NotFound' :: FindBookResult (S2 '[NotFound])
-  Found' :: FindBookResult (S2 '[Found])
-
-findBook :: String -> Peer Role BookSt Seller IO FindBookResult (S2 s)
-findBook _st = I.do 
-  At b <- liftm $ liftIO $ randomIO @Bool
-  if b
-    then LiftM $ pure (ireturn Found')
-    else LiftM $ pure (ireturn NotFound')
-
-sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
-sellerPeer = I.do
-  Recv (Title st) <- await
-  findBook st I.>>= \case
-    NotFound' -> yield NoBook
-    Found' -> I.do
-      yield (Price 30)
-      await I.>>= \case
-        Recv OneAccept -> yield (OneDate 100)
-        Recv TwoNotBuy -> returnAt ()
-        Recv TwoAccept -> yield (TwoDate 100)
-        Recv TwoNotBuy1 -> returnAt ()
-
-mvarsAsChannel
-  :: (MonadSTM m)
-  => TMVar m a
-  -> TMVar m a
-  -> Channel m a
-mvarsAsChannel bufferRead bufferWrite =
-  Channel{send, recv}
- where
-  send x = atomically (putTMVar bufferWrite x)
-  recv = atomically (Just <$> takeTMVar bufferRead)
-
-myTracer :: (MonadSay m) => String -> Tracer Role BookSt m
-myTracer st v = say (st <> show v)
-
 instance Show (AnyMsg Role BookSt) where
   show (AnyMsg msg) = case msg of
     Title st -> "Title " <> show st
@@ -395,47 +257,3 @@ instance Show (AnyMsg Role BookSt) where
     TwoSuccess d -> "TwoSuccess " <> show d
     TwoNotBuy1 -> "TwoNotBuy1"
     TwoFailed -> "TwoFailed"
-
-runAll :: IO ()
-runAll = do
-  buyerTMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  buyer2TMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  let buyerSellerChannel = mvarsAsChannel @_ buyerTMVar sellerTMVar
-      buyerBuyer2Channel = mvarsAsChannel @_ buyerTMVar buyer2TMVar
-
-      sellerBuyerChannel = mvarsAsChannel @_ sellerTMVar buyerTMVar
-
-      buyer2BuyerChannel = mvarsAsChannel @_ buyer2TMVar buyerTMVar
-
-      sendFun bufferWrite x = atomically (putTMVar bufferWrite x)
-      sendToRole =
-        IntMap.fromList
-          [ (singToInt SSeller, sendFun sellerTMVar)
-          , (singToInt SBuyer, sendFun buyerTMVar)
-          , (singToInt SBuyer2, sendFun buyer2TMVar)
-          ]
-  buyerTvar <- newTVarIO IntMap.empty
-  buyer2Tvar <- newTVarIO IntMap.empty
-  sellerTvar <- newTVarIO IntMap.empty
-  let buyerDriver = driverSimple (myTracer "buyer :") encodeMsg sendToRole buyerTvar
-      buyer2Driver = driverSimple (myTracer "buyer2 :") encodeMsg sendToRole buyer2Tvar
-      sellerDriver = driverSimple (myTracer "seller :") encodeMsg sendToRole sellerTvar
-  -- fork buyer decode thread, seller -> buyer
-  forkIO $ decodeLoop (myTracer "buyer :") Nothing (Decode decodeMsg) buyerSellerChannel buyerTvar
-  -- fork buyer decode thread, buyer2 -> buyer
-  forkIO $ decodeLoop (myTracer "buyer :") Nothing (Decode decodeMsg) buyerBuyer2Channel buyerTvar
-
-  -- fork seller decode thread, buyer -> seller
-  forkIO $ decodeLoop (myTracer "seller :") Nothing (Decode decodeMsg) sellerBuyerChannel sellerTvar
-
-  -- fork buyer2 decode thread, buyer -> buyer2
-  forkIO $ decodeLoop (myTracer "buyer2 :") Nothing (Decode decodeMsg) buyer2BuyerChannel buyer2Tvar
-
-  -- fork seller Peer thread
-  forkIO $ void $ runPeerWithDriver sellerDriver sellerPeer
-
-  -- fork buyer2 Peer thread
-  forkIO $ void $ runPeerWithDriver buyer2Driver buyer2Peer
-  -- run buyer Peer
-  void $ runPeerWithDriver buyerDriver buyerPeer

@@ -3,7 +3,7 @@ module Main (main) where
 import qualified Book
 import qualified Book1
 import qualified Book2
-import qualified Book3
+import qualified Book3.Main as Book3
 import qualified PingPong
 
 main :: IO ()

@@ -92,7 +92,9 @@ test-suite typed-communication-protocol-test
     other-modules: Book
                  , Book1
                  , Book2
-                 , Book3
+                 , Book3.Type
+                 , Book3.Peer
+                 , Book3.Main
                  , PingPong
 
     -- LANGUAGE extensions used by modules in this package.
