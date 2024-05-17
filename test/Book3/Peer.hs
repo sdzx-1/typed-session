@@ -64,23 +64,25 @@ buyerPeer = I.do
           Recv (OneDate d) <- await
           yield (OneSuccess d)
           returnAt $ Just d
-        OTTwo -> I.do
-          yield (PriceToBuyer2 i)
-          await I.>>= \case
-            Recv NotSupport1 -> I.do
-              yield TwoNotBuy
-              returnAt Nothing
-            Recv (SupportVal h) -> I.do
-              checkPrice i h I.>>= \case
-                Yes -> I.do
-                  yield TwoAccept
-                  Recv (TwoDate d) <- await
-                  yield (TwoSuccess d)
-                  returnAt (Just d)
-                No -> I.do
-                  yield TwoNotBuy1
-                  yield TwoFailed
-                  returnAt Nothing
+        OTTwo -> f1
+    where f1 :: Peer Role BookSt 'Buyer IO (At (Maybe Date) (Done Buyer)) ('S1 '[ 'Two, 'Found])
+          f1 = I.do
+            yield (PriceToBuyer2 300)
+            await I.>>= \case
+              Recv NotSupport1 -> I.do
+                yield TwoNotBuy
+                returnAt Nothing
+              Recv (SupportVal h) -> I.do
+                checkPrice 10 h I.>>= \case
+                  Yes -> I.do
+                    yield TwoAccept
+                    Recv (TwoDate d) <- await
+                    yield (TwoSuccess d)
+                    returnAt (Just d)
+                  No -> I.do
+                    yield TwoNotBuy1
+                    yield TwoFailed
+                    returnAt Nothing
 
 data BuySupp :: BookSt -> Type where
   BNS :: BuySupp (S6 '[NotSupport, Two, Found])
