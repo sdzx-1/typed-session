@@ -16,11 +16,11 @@
 module Book3.Peer where
 
 import Book3.Type
-import Control.Monad.IO.Class (liftIO)
+import Control.Algebra (Has)
+import Control.Effect.Random (Random, uniform)
 import Data.IFunctor (At (..), ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
-import System.Random (randomIO)
 import TypedProtocol.Core
 
 budget :: Int
@@ -30,9 +30,13 @@ data CheckPriceResult :: BookSt -> Type where
   Yes :: CheckPriceResult (S3 [Enough, Support, Two, Found])
   No :: CheckPriceResult (S3 [NotEnough, Support, Two, Found])
 
-checkPrice :: Int -> Int -> Peer Role BookSt Buyer IO CheckPriceResult (S3 s)
+checkPrice
+  :: (Has Random sig m)
+  => Int
+  -> Int
+  -> Peer Role BookSt Buyer m CheckPriceResult (S3 s)
 checkPrice _i _h = I.do
-  At b <- liftm $ liftIO $ randomIO @Bool
+  At b <- liftm $ uniform @Bool
   if b
     then LiftM $ pure (ireturn Yes)
     else LiftM $ pure (ireturn No)
@@ -41,15 +45,19 @@ data OT :: BookSt -> Type where
   OTOne :: OT (S1 [One, Found])
   OTTwo :: OT (S1 [Two, Found])
 
-choiceOT :: Int -> Peer Role BookSt Buyer IO OT (S1 s)
+choiceOT
+  :: (Has Random sig m)
+  => Int
+  -> Peer Role BookSt Buyer m OT (S1 s)
 choiceOT _i = I.do
-  At b <- liftm $ liftIO $ randomIO @Bool
+  At b <- liftm $ uniform @Bool
   if b
     then LiftM $ pure $ ireturn OTOne
     else LiftM $ pure $ ireturn OTTwo
 
 buyerPeer
-  :: Peer Role BookSt Buyer IO (At (Maybe Date) (Done Buyer)) S0
+  :: (Has Random sig m)
+  => Peer Role BookSt Buyer m (At (Maybe Date) (Done Buyer)) S0
 buyerPeer = I.do
   yield (Title "haskell book")
   await I.>>= \case
@@ -65,38 +73,45 @@ buyerPeer = I.do
           yield (OneSuccess d)
           returnAt $ Just d
         OTTwo -> f1
-    where f1 :: Peer Role BookSt 'Buyer IO (At (Maybe Date) (Done Buyer)) ('S1 '[ 'Two, 'Found])
-          f1 = I.do
-            yield (PriceToBuyer2 300)
-            await I.>>= \case
-              Recv NotSupport1 -> I.do
-                yield TwoNotBuy
-                returnAt Nothing
-              Recv (SupportVal h) -> I.do
-                checkPrice 10 h I.>>= \case
-                  Yes -> I.do
-                    yield TwoAccept
-                    Recv (TwoDate d) <- await
-                    yield (TwoSuccess d)
-                    returnAt (Just d)
-                  No -> I.do
-                    yield TwoNotBuy1
-                    yield TwoFailed
-                    returnAt Nothing
+ where
+  f1
+    :: (Has Random sig m)
+    => Peer Role BookSt 'Buyer m (At (Maybe Date) (Done Buyer)) ('S1 '[ 'Two, 'Found])
+  f1 = I.do
+    yield (PriceToBuyer2 300)
+    await I.>>= \case
+      Recv NotSupport1 -> I.do
+        yield TwoNotBuy
+        returnAt Nothing
+      Recv (SupportVal h) -> I.do
+        checkPrice 10 h I.>>= \case
+          Yes -> I.do
+            yield TwoAccept
+            Recv (TwoDate d) <- await
+            yield (TwoSuccess d)
+            returnAt (Just d)
+          No -> I.do
+            yield TwoNotBuy1
+            yield TwoFailed
+            returnAt Nothing
 
 data BuySupp :: BookSt -> Type where
   BNS :: BuySupp (S6 '[NotSupport, Two, Found])
   BS :: BuySupp (S6 '[Support, Two, Found])
 
-choiceB :: Int -> Peer Role BookSt Buyer2 IO BuySupp (S6 s)
+choiceB
+  :: (Has Random sig m)
+  => Int
+  -> Peer Role BookSt Buyer2 m BuySupp (S6 s)
 choiceB _i = I.do
-  At b <- liftm $ liftIO $ randomIO @Bool
+  At b <- liftm $ uniform @Bool
   if b
     then LiftM $ pure $ ireturn BNS
     else LiftM $ pure $ ireturn BS
 
 buyer2Peer
-  :: Peer Role BookSt Buyer2 IO (At (Maybe Date) (Done Buyer2)) (S1 s)
+  :: (Has Random sig m)
+  => Peer Role BookSt Buyer2 m (At (Maybe Date) (Done Buyer2)) (S1 s)
 buyer2Peer = I.do
   await I.>>= \case
     Recv SellerNoBook -> returnAt Nothing
@@ -118,14 +133,19 @@ data FindBookResult :: BookSt -> Type where
   NotFound' :: FindBookResult (S2 '[NotFound])
   Found' :: FindBookResult (S2 '[Found])
 
-findBook :: String -> Peer Role BookSt Seller IO FindBookResult (S2 s)
+findBook
+  :: (Has Random sig m)
+  => String
+  -> Peer Role BookSt Seller m FindBookResult (S2 s)
 findBook _st = I.do
-  At b <- liftm $ liftIO $ randomIO @Bool
+  At b <- liftm $ uniform @Bool
   if b
     then LiftM $ pure (ireturn Found')
     else LiftM $ pure (ireturn NotFound')
 
-sellerPeer :: Peer Role BookSt Seller IO (At () (Done Seller)) S0
+sellerPeer
+  :: (Has Random sig m)
+  => Peer Role BookSt Seller m (At () (Done Seller)) S0
 sellerPeer = I.do
   Recv (Title st) <- await
   findBook st I.>>= \case

@@ -116,5 +116,7 @@ test-suite typed-communication-protocol-test
         containers,
         io-classes,
         io-sim,
-        random
+        random,
+        fused-effects,
+        fused-effects-random
     ghc-options:  -Werror=inaccessible-code -threaded

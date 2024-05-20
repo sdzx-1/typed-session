@@ -45,7 +45,6 @@ data Driver role' ps m
 runPeerWithDriver
   :: forall role' ps (r :: role') (st :: ps) m a
    . ( Monad m
-     , MonadSTM m
      , (SingToInt role')
      )
   => Driver role' ps m

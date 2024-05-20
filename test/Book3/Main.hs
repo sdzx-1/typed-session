@@ -17,14 +17,19 @@ module Book3.Main where
 
 import Book3.Peer
 import Book3.Type
+import Control.Carrier.Random.Gen (runRandom)
 import Control.Concurrent.Class.MonadSTM
+import Control.Effect.Labelled (runLabelledLift, sendM)
 import Control.Monad
-import Control.Monad.Class.MonadFork (forkIO)
+import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadSay
+import Control.Monad.Class.MonadThrow (MonadThrow)
 import qualified Data.IntMap as IntMap
+import System.Random (StdGen, split)
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import TypedProtocol.Driver
+import Control.Monad.IOSim
 
 mvarsAsChannel
   :: (MonadSTM m)
@@ -40,19 +45,28 @@ mvarsAsChannel bufferRead bufferWrite =
 myTracer :: (MonadSay m) => String -> Tracer Role BookSt m
 myTracer st v = say (st <> show v)
 
-runAll :: IO ()
-runAll = do
-  buyerTMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  buyer2TMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @_ @(AnyMsg Role BookSt)
-  let buyerSellerChannel = mvarsAsChannel @_ buyerTMVar sellerTMVar
-      buyerBuyer2Channel = mvarsAsChannel @_ buyerTMVar buyer2TMVar
+runAll
+  :: forall n
+   . ( Monad n
+     , MonadSTM n
+     , MonadSay n
+     , MonadThrow n
+     , MonadFork n
+     )
+  => StdGen
+  -> n ()
+runAll g = do
+  buyerTMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
+  buyer2TMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
+  sellerTMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
+  let buyerSellerChannel = mvarsAsChannel @n buyerTMVar sellerTMVar
+      buyerBuyer2Channel = mvarsAsChannel @n buyerTMVar buyer2TMVar
 
-      sellerBuyerChannel = mvarsAsChannel @_ sellerTMVar buyerTMVar
+      sellerBuyerChannel = mvarsAsChannel @n sellerTMVar buyerTMVar
 
-      buyer2BuyerChannel = mvarsAsChannel @_ buyer2TMVar buyerTMVar
+      buyer2BuyerChannel = mvarsAsChannel @n buyer2TMVar buyerTMVar
 
-      sendFun bufferWrite x = atomically (putTMVar bufferWrite x)
+      sendFun bufferWrite x = atomically @n (putTMVar bufferWrite x)
       sendToRole =
         IntMap.fromList
           [ (singToInt SSeller, sendFun sellerTMVar)
@@ -62,9 +76,9 @@ runAll = do
   buyerTvar <- newTVarIO IntMap.empty
   buyer2Tvar <- newTVarIO IntMap.empty
   sellerTvar <- newTVarIO IntMap.empty
-  let buyerDriver = driverSimple (myTracer "buyer :") encodeMsg sendToRole buyerTvar id
-      buyer2Driver = driverSimple (myTracer "buyer2 :") encodeMsg sendToRole buyer2Tvar id
-      sellerDriver = driverSimple (myTracer "seller :") encodeMsg sendToRole sellerTvar id
+  let buyerDriver = driverSimple (myTracer "buyer :") encodeMsg sendToRole buyerTvar sendM
+      buyer2Driver = driverSimple (myTracer "buyer2 :") encodeMsg sendToRole buyer2Tvar sendM
+      sellerDriver = driverSimple (myTracer "seller :") encodeMsg sendToRole sellerTvar sendM
   -- fork buyer decode thread, seller -> buyer
   forkIO $ decodeLoop (myTracer "buyer :") Nothing (Decode decodeMsg) buyerSellerChannel buyerTvar
   -- fork buyer decode thread, buyer2 -> buyer
@@ -76,10 +90,29 @@ runAll = do
   -- fork buyer2 decode thread, buyer -> buyer2
   forkIO $ decodeLoop (myTracer "buyer2 :") Nothing (Decode decodeMsg) buyer2BuyerChannel buyer2Tvar
 
+  let (g0, g1) = split g
+      (g2, g3) = split g0
+
+  resultTMVar1 <- newEmptyTMVarIO
+  resultTMVar2 <- newEmptyTMVarIO
+
   -- fork seller Peer thread
-  forkIO $ void $ runPeerWithDriver sellerDriver sellerPeer
+  forkIO $ do
+    runLabelledLift $ runRandom g1 $ runPeerWithDriver sellerDriver sellerPeer
+    atomically $ writeTMVar resultTMVar1 ()
 
   -- fork buyer2 Peer thread
-  forkIO $ void $ runPeerWithDriver buyer2Driver buyer2Peer
+  forkIO $ do
+    runLabelledLift $ runRandom g2 $ runPeerWithDriver buyer2Driver buyer2Peer
+    atomically $ writeTMVar resultTMVar2 ()
+
   -- run buyer Peer
-  void $ runPeerWithDriver buyerDriver buyerPeer
+  void $ runLabelledLift $ runRandom g3 $ runPeerWithDriver buyerDriver buyerPeer
+
+  -- wait seller, buyer
+  atomically $ do
+    takeTMVar resultTMVar1
+    takeTMVar resultTMVar2
+
+book3Prop :: StdGen -> Either Failure ()
+book3Prop v = runSim (runAll v)

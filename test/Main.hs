@@ -1,21 +1,15 @@
+{-# LANGUAGE TypeApplications #-}
 module Main (main) where
 
-import qualified Book
-import qualified Book1
-import qualified Book2
-import qualified Book3.Main as Book3
-import qualified PingPong
+import Book3.Main
+import Control.Monad
+import System.Random
+import Control.Exception
 
 main :: IO ()
-main = do
-  putStrLn "----------------- run Book -----------------"
-  Book.runAll
-  putStrLn "---------------- run Book1 -----------------"
-  Book1.runAll
-  putStrLn "---------------- run Book2 -----------------"
-  Book2.runAll
-  putStrLn "---------------- run Book3 -----------------"
-  Book3.runAll
-  putStrLn "---------------- run PingPong -----------------"
-  PingPong.runAll
-  putStrLn "--------------------------------------------"
+main =  do
+  replicateM_ 100 $ do
+    g <- newStdGen
+    case book3Prop g of
+      Left e -> throwIO e
+      Right _ -> pure ()
