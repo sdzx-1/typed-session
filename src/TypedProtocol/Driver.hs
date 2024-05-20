@@ -36,7 +36,10 @@ data Driver role' ps m
       -> Msg role' ps st '(send, st') '(recv, st'')
       -> m ()
   , recvMsg
-      :: TVar m (AgencyMsg role' ps)
+      :: forall (st' :: ps)
+       . (SingToInt ps)
+      => Sing st'
+      -> m (AnyMsg role' ps)
   }
 
 runPeerWithDriver
@@ -61,14 +64,7 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     sendMsg (sing @recv) msg
     go k
   go (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
-    let singInt = singToInt $ sing @st'
-    AnyMsg msg <- atomically $ do
-      agencyMsg <- readTVar recvMsg
-      case IntMap.lookup singInt agencyMsg of
-        Nothing -> retry
-        Just v -> do
-          writeTVar recvMsg (IntMap.delete singInt agencyMsg)
-          pure v
+    AnyMsg msg <- recvMsg (sing @st')
     go (k $ unsafeCoerce (Recv msg))
 
 data TraceSendRecv role' ps where
@@ -85,15 +81,20 @@ nullTracer :: (Monad m) => a -> m ()
 nullTracer _ = pure ()
 
 driverSimple
-  :: forall role' ps bytes m
-   . (Monad m, Ord role')
-  => Tracer role' ps m
+  :: forall role' ps bytes m n
+   . ( Monad m
+     , Monad n
+     , MonadSTM n
+     , Ord role'
+     )
+  => Tracer role' ps n
   -> Encode role' ps bytes
-  -> SendToRole role' m bytes
-  -> TVar m (AgencyMsg role' ps)
+  -> SendToRole role' n bytes
+  -> TVar n (AgencyMsg role' ps)
+  -> (forall a. n a -> m a)
   -> Driver role' ps m
-driverSimple tracer Encode{encode} sendToRole tvar =
-  Driver{sendMsg, recvMsg = tvar}
+driverSimple tracer Encode{encode} sendToRole tvar liftFun =
+  Driver{sendMsg, recvMsg}
  where
   sendMsg
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
@@ -105,20 +106,35 @@ driverSimple tracer Encode{encode} sendToRole tvar =
     => Sing recv
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
-  sendMsg role msg = do
+  sendMsg role msg = liftFun $ do
     case IntMap.lookup (singToInt role) sendToRole of
       Nothing -> error "np"
       Just sendFun -> sendFun (encode msg)
     tracer (TraceSendMsg (AnyMsg msg))
 
+  recvMsg
+    :: forall (st' :: ps)
+     . (SingToInt ps)
+    => Sing st'
+    -> m (AnyMsg role' ps)
+  recvMsg sst' = do
+    let singInt = singToInt sst'
+    liftFun $ atomically $ do
+      agencyMsg <- readTVar tvar
+      case IntMap.lookup singInt agencyMsg of
+        Nothing -> retry
+        Just v -> do
+          writeTVar tvar (IntMap.delete singInt agencyMsg)
+          pure v
+
 decodeLoop
-  :: (Exception failure, MonadSTM m, MonadThrow m)
-  => Tracer role' ps m
+  :: (Exception failure, MonadSTM n, MonadThrow n)
+  => Tracer role' ps n
   -> Maybe bytes
-  -> Decode role' ps failure m bytes
-  -> Channel m bytes
-  -> TVar m (AgencyMsg role' ps)
-  -> m ()
+  -> Decode role' ps failure n bytes
+  -> Channel n bytes
+  -> TVar n (AgencyMsg role' ps)
+  -> n ()
 decodeLoop tracer mbt d@Decode{decode} channel tvar = do
   result <- runDecoderWithChannel channel mbt decode
   case result of

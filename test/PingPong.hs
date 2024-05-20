@@ -186,8 +186,8 @@ runAll = do
           ]
   clientTvar <- newTVarIO IntMap.empty
   serverTvar <- newTVarIO IntMap.empty
-  let clientDriver = driverSimple (myTracer "client: ") encodeMsg sendToRole clientTvar
-      serverDriver = driverSimple (myTracer "server: ") encodeMsg sendToRole serverTvar
+  let clientDriver = driverSimple (myTracer "client: ") encodeMsg sendToRole clientTvar id
+      serverDriver = driverSimple (myTracer "server: ") encodeMsg sendToRole serverTvar id
   -- fork client decode thread
   forkIO $ decodeLoop (myTracer "client: ") Nothing (Decode decodeMsg) clientChannel clientTvar
   -- fork server decode thread

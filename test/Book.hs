@@ -222,8 +222,8 @@ runAll = do
           ]
   buyerTvar <- newTVarIO IntMap.empty
   sellerTvar <- newTVarIO IntMap.empty
-  let buyerDriver = driverSimple (myTracer "buyer") encodeMsg sendToRole buyerTvar
-      sellerDriver = driverSimple (myTracer "seller") encodeMsg sendToRole sellerTvar
+  let buyerDriver = driverSimple (myTracer "buyer") encodeMsg sendToRole buyerTvar id
+      sellerDriver = driverSimple (myTracer "seller") encodeMsg sendToRole sellerTvar id
   -- fork buyer decode thread, seller -> buyer
   forkIO $ decodeLoop (myTracer "buyer") Nothing (Decode decodeMsg) buyerChannel buyerTvar
   -- fork seller decode thread, buyer -> seller
