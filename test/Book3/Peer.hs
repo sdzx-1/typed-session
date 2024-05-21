@@ -114,7 +114,7 @@ buyer2Peer
   => Peer Role BookSt Buyer2 m (At (Maybe Date) (Done Buyer2)) (S1 s)
 buyer2Peer = I.do
   await I.>>= \case
-    Recv SellerNoBook -> returnAt Nothing
+    -- Recv SellerNoBook -> returnAt Nothing
     Recv OneAfford -> I.do
       Recv (OneSuccess d) <- await
       returnAt (Just d)
