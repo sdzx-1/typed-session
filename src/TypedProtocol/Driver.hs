@@ -88,7 +88,7 @@ driverSimple
      )
   => Tracer role' ps n
   -> Encode role' ps bytes
-  -> SendToRole role' n bytes
+  -> SendMap role' n bytes
   -> TVar n (AgencyMsg role' ps)
   -> (forall a. n a -> m a)
   -> Driver role' ps m
