@@ -109,17 +109,14 @@ encodeMsg = Encode $ \x -> case x of
   Stop{} -> AnyMsg x
 
 decodeMsg
-  :: forall m
-   . (Monad m)
-  => DecodeStep
+  :: DecodeStep
       (AnyMsg Role PingPong)
       CodecFailure
-      m
       (AnyMsg Role PingPong)
 decodeMsg =
   DecodePartial $ \case
-    Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-    Just anyMsg -> pure $ DecodeDone anyMsg Nothing
+    Nothing -> DecodeFail (CodecFailure "expected more data")
+    Just anyMsg -> DecodeDone anyMsg Nothing
 
 data Choice :: PingPong -> Type where
   ST :: Choice (S0 True)

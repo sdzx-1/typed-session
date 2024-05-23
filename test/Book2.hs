@@ -186,17 +186,14 @@ encodeMsg = Encode $ \x -> case x of
   SellerNotFoundBook{} -> AnyMsg x
 
 decodeMsg
-  :: forall m
-   . (Monad m)
-  => DecodeStep
+  :: DecodeStep
       (AnyMsg Role BookSt)
       CodecFailure
-      m
       (AnyMsg Role BookSt)
 decodeMsg =
   DecodePartial $ \case
-    Nothing -> return $ DecodeFail (CodecFailure "expected more data")
-    Just anyMsg -> pure $ DecodeDone anyMsg Nothing
+    Nothing -> DecodeFail (CodecFailure "expected more data")
+    Just anyMsg -> DecodeDone anyMsg Nothing
 
 budget :: Int
 budget = 16

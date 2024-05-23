@@ -130,7 +130,7 @@ decodeLoop
   :: (Exception failure, MonadSTM n, MonadThrow n)
   => Tracer role' ps n
   -> Maybe bytes
-  -> Decode role' ps failure n bytes
+  -> Decode role' ps failure bytes
   -> Channel n bytes
   -> TVar n (AgencyMsg role' ps)
   -> n ()
