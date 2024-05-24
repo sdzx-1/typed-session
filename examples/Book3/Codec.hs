@@ -16,11 +16,6 @@
 
 module Codec where
 
-import Data.IFunctor (Sing, SingI)
-import qualified Data.IFunctor as I
-import Data.Kind
-import GHC.Exts (dataToTag#)
-import GHC.Int (Int (I#))
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import qualified Data.ByteString.Lazy as L

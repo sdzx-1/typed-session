@@ -4,19 +4,15 @@
 -- Echo server program
 module Main (main) where
 
-import Control.Concurrent (forkFinally)
 import qualified Control.Exception as E
-import Control.Monad (unless, forever, void)
-import qualified Data.ByteString as S
+import Control.Monad (void)
 import Network.Socket
-import Network.Socket.ByteString (recv, sendAll, send)
 import Codec
 import TypedProtocol.Core
 import qualified TypedProtocol.Codec as C
 import Type
 import Control.Concurrent.Class.MonadSTM
 import qualified Data.IntMap as IntMap
-import Control.Effect.Lift (sendM)
 import TypedProtocol.Driver
 import Control.Monad.Class.MonadFork
 import TypedProtocol.Codec (Decode(..))
