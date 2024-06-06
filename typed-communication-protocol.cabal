@@ -174,6 +174,24 @@ executable client
   hs-source-dirs: examples/PingPong
   other-modules: Type
 
+
+executable counter
+  build-depends: base
+               , typed-communication-protocol
+               , containers
+               , io-classes
+               , io-sim
+               , random
+               , fused-effects
+               , fused-effects-random
+               , binary
+               , bytestring
+               , network
+  main-is: Counter.hs
+  default-language: Haskell2010
+  hs-source-dirs: examples/PingPong
+  other-modules: Type
+
 test-suite typed-communication-protocol-test
     -- Import common warning flags.
     import:           warnings

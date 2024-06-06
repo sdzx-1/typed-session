@@ -3,25 +3,25 @@
 -- Echo client program
 module Main (main) where
 
-import qualified Control.Exception as E
-import Network.Socket
 import Control.Concurrent.Class.MonadSTM
-import qualified Data.IntMap as IntMap
-import Type (socketAsChannel, SRole (..), myTracer, encodeMsg, decodeMsg, clientPeer)
-import TypedProtocol.Core
-import qualified TypedProtocol.Codec as C
-import TypedProtocol.Driver (driverSimple, decodeLoop, runPeerWithDriver)
-import Control.Monad.Class.MonadFork
-import TypedProtocol.Codec (Decode(..))
+import qualified Control.Exception as E
 import Control.Monad (void)
+import Control.Monad.Class.MonadFork
+import qualified Data.IntMap as IntMap
+import Network.Socket
+import Type (SRole (..), clientPeer, decodeMsg, encodeMsg, myTracer, socketAsChannel)
+import TypedProtocol.Codec (Decode (..))
+import qualified TypedProtocol.Codec as C
+import TypedProtocol.Core
+import TypedProtocol.Driver (decodeLoop, driverSimple, runPeerWithDriver)
 
 main :: IO ()
-main = runTCPClient "127.0.0.1" "3000"
+main = runTCPClient
 
-runTCPClient :: HostName -> ServiceName -> IO ()
-runTCPClient host port = withSocketsDo $ do
+getSocket :: HostName -> ServiceName -> IO Socket
+getSocket host port = do
   addr <- resolve
-  E.bracket (open addr) close client
+  open addr
   where
     resolve = do
       let hints = defaultHints {addrSocketType = Stream}
@@ -31,14 +31,32 @@ runTCPClient host port = withSocketsDo $ do
       connect sock $ addrAddress addr
       return sock
 
-    client sock = do
-      clientTvar  <- newTVarIO IntMap.empty
-      let serverChannel = socketAsChannel sock
-          sendMap = IntMap.fromList [(singToInt SServer, C.send serverChannel)]
+runTCPClient :: IO ()
+runTCPClient = withSocketsDo $ do
+  E.bracket
+    ( do
+        serverSock <- getSocket "127.0.0.1" "3000"
+        countSock <- getSocket "127.0.0.1" "3001"
+        pure (serverSock, countSock)
+    )
+    (\(a, b) -> close a >> close b)
+    (client)
+  where
+    client (serverSock, countSock) = do
+      clientTvar <- newTVarIO IntMap.empty
+      let serverChannel = socketAsChannel serverSock
+          counterChannel = socketAsChannel countSock
+          sendMap =
+            IntMap.fromList
+              [ (singToInt SServer, C.send serverChannel),
+                (singToInt SCounter, C.send counterChannel)
+              ]
           clientDriver = driverSimple (myTracer "client: ") encodeMsg sendMap clientTvar id
 
-      thid <- forkIO $ decodeLoop (myTracer "client: ") Nothing (Decode decodeMsg) serverChannel clientTvar
+      thid1 <- forkIO $ decodeLoop (myTracer "client: ") Nothing (Decode decodeMsg) serverChannel clientTvar
+      thid2 <- forkIO $ decodeLoop (myTracer "client: ") Nothing (Decode decodeMsg) counterChannel clientTvar
 
       void $ runPeerWithDriver clientDriver (clientPeer 0)
 
-      killThread thid
+      killThread thid1
+      killThread thid2
