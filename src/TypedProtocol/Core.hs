@@ -51,12 +51,18 @@ data Peer role' ps (r :: role') (m :: Type -> Type) (ia :: ps -> Type) (st :: ps
   IReturn :: ia st -> Peer role' ps r m ia st
   LiftM :: m (Peer role' ps r m ia st') -> Peer role' ps r m ia st
   Yield
-    :: (SingI recv, SingI from, SingToInt ps)
+    :: ( SingI recv
+       , SingI from
+       , SingToInt ps
+       )
     => Msg role' ps from '(send, sps) '(recv, rps)
     -> Peer role' ps send m ia sps
     -> Peer role' ps send m ia from
   Await
-    :: (SingI recv, SingI from, SingToInt ps)
+    :: ( SingI recv
+       , SingI from
+       , SingToInt ps
+       )
     => (Recv role' ps recv from ~> Peer role' ps recv m ia)
     -> Peer role' ps recv m ia from
 
@@ -79,13 +85,21 @@ instance (Functor m) => IMonad (Peer role' ps r m) where
     Await cont -> Await (ibind f . cont)
 
 yield
-  :: (Functor m, SingI recv, SingI from, SingToInt ps)
+  :: ( Functor m
+     , SingI recv
+     , SingI from
+     , SingToInt ps
+     )
   => Msg role' ps from '(send, sps) '(recv, rps)
   -> Peer role' ps send m (At () sps) from
 yield msg = Yield msg (returnAt ())
 
 await
-  :: (Functor m, SingI recv, SingI from, SingToInt ps)
+  :: ( Functor m
+     , SingI recv
+     , SingI from
+     , SingToInt ps
+     )
   => Peer role' ps recv m (Recv role' ps recv from) from
 await = Await ireturn
 

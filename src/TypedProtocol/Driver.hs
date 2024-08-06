@@ -84,7 +84,6 @@ driverSimple
    . ( Monad m
      , Monad n
      , MonadSTM n
-     , Ord role'
      )
   => Tracer role' ps n
   -> Encode role' ps bytes
@@ -118,13 +117,16 @@ driverSimple tracer Encode{encode} sendToRole tvar liftFun =
     -> m (AnyMsg role' ps)
   recvMsg sst' = do
     let singInt = singToInt sst'
-    liftFun $ atomically $ do
-      agencyMsg <- readTVar tvar
-      case IntMap.lookup singInt agencyMsg of
-        Nothing -> retry
-        Just v -> do
-          writeTVar tvar (IntMap.delete singInt agencyMsg)
-          pure v
+    liftFun $ do
+      anyMsg <- atomically $ do
+        agencyMsg <- readTVar tvar
+        case IntMap.lookup singInt agencyMsg of
+          Nothing -> retry
+          Just v -> do
+            writeTVar tvar (IntMap.delete singInt agencyMsg)
+            pure v
+      tracer (TraceRecvMsg (anyMsg))
+      pure anyMsg
 
 decodeLoop
   :: (Exception failure, MonadSTM n, MonadThrow n)
@@ -137,8 +139,7 @@ decodeLoop
 decodeLoop tracer mbt d@Decode{decode} channel tvar = do
   result <- runDecoderWithChannel channel mbt decode
   case result of
-    Right (anyMsg@(AnyMsg msg), mbt') -> do
-      tracer (TraceRecvMsg anyMsg)
+    Right (AnyMsg msg, mbt') -> do
       let agencyInt = singToInt $ msgFromStSing msg
       atomically $ do
         agencyMsg <- readTVar tvar
