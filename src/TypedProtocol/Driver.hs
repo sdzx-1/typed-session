@@ -11,18 +11,38 @@
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
+{- |
+Schematic diagram of the communication structure of three roles through typed-session:
+![fm](data/fm.png)
+
+Some explanations for this diagram:
+
+1. Roles are connected through channels, and there are many types of channels, such as channels established through TCP or channels established through TMVar.
+
+2. Each role has a Peer thread, in which the Peer runs.
+
+3. Each role has one or more decode threads, and the decoded Msgs are placed in the MsgCache.
+
+4. SendMap aggregates the send functions of multiple Channels together.
+When sending a message, the send function of the receiver is searched from SendMap.
+-}
 module TypedProtocol.Driver where
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
 import Data.IFunctor (At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
+import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.Exception (Exception)
 import TypedProtocol.Codec
 import TypedProtocol.Core
 import Unsafe.Coerce (unsafeCoerce)
 
+{- |
+Contains two functions sendMsg, recvMsg.
+runPeerWithDriver uses them to send and receive Msg.
+-}
 data Driver role' ps m
   = Driver
   { sendMsg
@@ -42,6 +62,9 @@ data Driver role' ps m
       -> m (AnyMsg role' ps)
   }
 
+{- |
+Interpret Peer.
+-}
 runPeerWithDriver
   :: forall role' ps (r :: role') (st :: ps) m a
    . ( Monad m
@@ -66,6 +89,9 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     AnyMsg msg <- recvMsg (sing @st')
     go (k $ unsafeCoerce (Recv msg))
 
+{- |
+A wrapper around AnyMsg that represents sending and receiving Msg.
+-}
 data TraceSendRecv role' ps where
   TraceSendMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
   TraceRecvMsg :: AnyMsg role' ps -> TraceSendRecv role' ps
@@ -74,11 +100,38 @@ instance (Show (AnyMsg role' ps)) => Show (TraceSendRecv role' ps) where
   show (TraceSendMsg msg) = "Send " ++ show msg
   show (TraceRecvMsg msg) = "Recv " ++ show msg
 
+{- |
+Similar to the log function, used to print received or sent messages.
+-}
 type Tracer role' ps m = TraceSendRecv role' ps -> m ()
 
+{- |
+The default trace function. It simply ignores everything.
+-}
 nullTracer :: (Monad m) => a -> m ()
 nullTracer _ = pure ()
 
+{- |
+SendMap aggregates the send functions of multiple Channels together.
+When sending a message, the send function of the receiver is found from SendMap.
+-}
+type SendMap role' m bytes = IntMap (bytes -> m ())
+
+{- |
+
+Build Driver through SendMap and MsgCache.
+Here we need some help from other functions:
+
+1. `Tracer role' ps n` is similar to the log function, used to print received or sent messages.
+2. `Encode role' ps` bytes encoding function, converts Msg into bytes.
+3. `forall a. n a -> m a` This is a bit complicated, I will explain it in detail below.
+
+I see Peer as three layers:
+
+1. `Peer` upper layer, meets the requirements of McBride Indexed Monad, uses do syntax construction, has semantic checks, and is interpreted to the second layer m through runPeerWithDriver.
+2. `m` middle layer, describes the business requirements in this layer, and converts the received Msg into specific business actions.
+3. `n` bottom layer, responsible for receiving and sending bytes. It can have multiple options such as IO or IOSim. Using IOSim can easily test the code.
+-}
 driverSimple
   :: forall role' ps bytes m n
    . ( Monad m
@@ -88,10 +141,10 @@ driverSimple
   => Tracer role' ps n
   -> Encode role' ps bytes
   -> SendMap role' n bytes
-  -> TVar n (AgencyMsg role' ps)
+  -> TVar n (MsgCache role' ps)
   -> (forall a. n a -> m a)
   -> Driver role' ps m
-driverSimple tracer Encode{encode} sendToRole tvar liftFun =
+driverSimple tracer Encode{encode} sendMap tvar liftFun =
   Driver{sendMsg, recvMsg}
  where
   sendMsg
@@ -105,7 +158,7 @@ driverSimple tracer Encode{encode} sendToRole tvar liftFun =
     -> Msg role' ps from '(send, st) '(recv, st1)
     -> m ()
   sendMsg role msg = liftFun $ do
-    case IntMap.lookup (singToInt role) sendToRole of
+    case IntMap.lookup (singToInt role) sendMap of
       Nothing -> error "np"
       Just sendFun -> sendFun (encode msg)
     tracer (TraceSendMsg (AnyMsg msg))
@@ -128,13 +181,26 @@ driverSimple tracer Encode{encode} sendToRole tvar liftFun =
       tracer (TraceRecvMsg (anyMsg))
       pure anyMsg
 
+{- |
+decode loop, usually in a separate thread.
+
+The decoded Msg is placed in MsgCache.
+
+@
+data Msg role' ps (from :: ps) (sendAndSt :: (role', ps)) (recvAndSt :: (role', ps))
+@
+Note that when placing a new Msg in MsgCache, if a Msg with the same `from` already exists in MsgCache, the decoding process will be blocked,
+until that Msg is consumed before placing the new Msg in MsgCache.
+
+This usually happens when the efficiency of Msg generation is greater than the efficiency of consumption.
+-}
 decodeLoop
   :: (Exception failure, MonadSTM n, MonadThrow n)
   => Tracer role' ps n
   -> Maybe bytes
   -> Decode role' ps failure bytes
   -> Channel n bytes
-  -> TVar n (AgencyMsg role' ps)
+  -> TVar n (MsgCache role' ps)
   -> n ()
 decodeLoop tracer mbt d@Decode{decode} channel tvar = do
   result <- runDecoderWithChannel channel mbt decode

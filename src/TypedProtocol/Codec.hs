@@ -13,9 +13,11 @@
 module TypedProtocol.Codec where
 
 import Control.Exception (Exception)
-import Data.IntMap (IntMap)
 import TypedProtocol.Core
 
+{- |
+Function to encode Msg into bytes.
+-}
 newtype Encode role' ps bytes = Encode
   { encode
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
@@ -23,10 +25,16 @@ newtype Encode role' ps bytes = Encode
       -> bytes
   }
 
+{- |
+Incremental decoding function.
+-}
 newtype Decode role' ps failure bytes = Decode
   { decode :: DecodeStep bytes failure (AnyMsg role' ps)
   }
 
+{- |
+Generic incremental decoder constructor, you need to convert specific incremental decoders to it.
+-}
 data DecodeStep bytes failure a
   = DecodePartial (Maybe bytes -> (DecodeStep bytes failure a))
   | DecodeDone a (Maybe bytes)
@@ -39,18 +47,22 @@ data CodecFailure
 
 instance Exception CodecFailure
 
-data Channel m a = Channel
-  { send :: a -> m ()
-  , recv :: m (Maybe a)
+{- |
+Bottom functions for sending and receiving bytes.
+-}
+data Channel m bytes = Channel
+  { send :: bytes -> m ()
+  , recv :: m (Maybe bytes)
   }
 
-type SendMap role' m a = IntMap (a -> m ())
-
+{- |
+Generic incremental decoding function.
+-}
 runDecoderWithChannel
   :: (Monad m)
   => Channel m bytes
   -> Maybe bytes
-  -> DecodeStep bytes failure  a
+  -> DecodeStep bytes failure a
   -> m (Either failure (a, Maybe bytes))
 runDecoderWithChannel Channel{recv} = go
  where
