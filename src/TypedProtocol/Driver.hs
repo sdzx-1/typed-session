@@ -13,7 +13,8 @@
 
 {- |
 Schematic diagram of the communication structure of three roles through typed-session:
-![fm](data/fm.png)
+
+<<data/fm.png>>
 
 Some explanations for this diagram:
 
