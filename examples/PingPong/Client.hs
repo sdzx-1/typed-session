@@ -10,10 +10,10 @@ import Control.Monad.Class.MonadFork
 import qualified Data.IntMap as IntMap
 import Network.Socket
 import Type (SRole (..), clientPeer, decodeMsg, encodeMsg, myTracer, socketAsChannel)
-import TypedProtocol.Codec (Decode (..))
-import qualified TypedProtocol.Codec as C
-import TypedProtocol.Core
-import TypedProtocol.Driver (decodeLoop, driverSimple, runPeerWithDriver)
+import TypedSession.Codec (Decode (..))
+import qualified TypedSession.Codec as C
+import TypedSession.Core
+import TypedSession.Driver (decodeLoop, driverSimple, runPeerWithDriver)
 
 main :: IO ()
 main = runTCPClient

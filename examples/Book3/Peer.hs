@@ -21,7 +21,7 @@ import Data.IFunctor (At (..), ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
 import Type
-import TypedProtocol.Core
+import TypedSession.Core
 
 budget :: Int
 budget = 16

@@ -10,7 +10,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE TypeOperators #-}
 
-module TypedProtocol.Core where
+module TypedSession.Core where
 
 import Data.IFunctor
 import Data.IntMap (IntMap)

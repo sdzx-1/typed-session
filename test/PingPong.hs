@@ -28,9 +28,9 @@ import qualified Data.IntMap as IntMap
 import Data.Kind
 import GHC.Exts (dataToTag#)
 import GHC.Int (Int (I#))
-import TypedProtocol.Codec
-import TypedProtocol.Core
-import TypedProtocol.Driver
+import TypedSession.Codec
+import TypedSession.Core
+import TypedSession.Driver
 
 {-
 

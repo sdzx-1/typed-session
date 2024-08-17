@@ -4,12 +4,12 @@ import qualified Control.Exception as E
 import qualified Data.IntMap as IntMap
 import Network.Socket
 import Type
-import qualified TypedProtocol.Codec as C
-import TypedProtocol.Core (singToInt)
+import qualified TypedSession.Codec as C
+import TypedSession.Core (singToInt)
 import Control.Concurrent.Class.MonadSTM
-import TypedProtocol.Driver (driverSimple, decodeLoop, runPeerWithDriver)
+import TypedSession.Driver (driverSimple, decodeLoop, runPeerWithDriver)
 import Control.Monad.Class.MonadFork
-import TypedProtocol.Codec (Decode(..))
+import TypedSession.Codec (Decode(..))
 import Control.Monad (void)
 
 main :: IO ()

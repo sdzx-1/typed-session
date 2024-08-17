@@ -9,15 +9,15 @@ import Network.Socket
 import Network.Socket.ByteString (recv, sendAll)
 import Codec (socketAsChannel, myTracer, encodeMsg, decodeMsg)
 import qualified Data.IntMap as IntMap
-import TypedProtocol.Core (SingToInt(singToInt))
-import qualified TypedProtocol.Codec as C
+import TypedSession.Core (SingToInt(singToInt))
+import qualified TypedSession.Codec as C
 import Type
 import Control.Concurrent.Class.MonadSTM
-import TypedProtocol.Driver (driverSimple)
+import TypedSession.Driver (driverSimple)
 import Control.Monad.IO.Class (liftIO)
 import Control.Monad.Class.MonadFork
-import TypedProtocol.Driver
-import TypedProtocol.Codec (Decode(..))
+import TypedSession.Driver
+import TypedSession.Codec (Decode(..))
 import Control.Effect.Labelled (runLabelledLift)
 import Control.Carrier.Random.Gen (runRandom)
 import System.Random (newStdGen)

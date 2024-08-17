@@ -8,14 +8,14 @@ import qualified Control.Exception as E
 import Control.Monad (void)
 import Network.Socket
 import Codec
-import TypedProtocol.Core
-import qualified TypedProtocol.Codec as C
+import TypedSession.Core
+import qualified TypedSession.Codec as C
 import Type
 import Control.Concurrent.Class.MonadSTM
 import qualified Data.IntMap as IntMap
-import TypedProtocol.Driver
+import TypedSession.Driver
 import Control.Monad.Class.MonadFork
-import TypedProtocol.Codec (Decode(..))
+import TypedSession.Codec (Decode(..))
 import Control.Effect.Labelled (runLabelledLift)
 import Control.Carrier.Random.Gen (runRandom)
 import Peer

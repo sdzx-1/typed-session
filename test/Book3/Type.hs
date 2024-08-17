@@ -19,8 +19,8 @@ import qualified Data.IFunctor as I
 import Data.Kind
 import GHC.Exts (dataToTag#)
 import GHC.Int (Int (I#))
-import TypedProtocol.Codec
-import TypedProtocol.Core
+import TypedSession.Codec
+import TypedSession.Core
 
 {-
 ---------------------------Buyer-------------------------Seller------------------------Buyer2---------------------------

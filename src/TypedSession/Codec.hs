@@ -10,10 +10,10 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# LANGUAGE UndecidableInstances #-}
 
-module TypedProtocol.Codec where
+module TypedSession.Codec where
 
 import Control.Exception (Exception)
-import TypedProtocol.Core
+import TypedSession.Core
 
 {- |
 Function to encode Msg into bytes.

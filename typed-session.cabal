@@ -63,9 +63,9 @@ library
 
     -- Modules exported by the library.
     exposed-modules: Data.IFunctor
-                   , TypedProtocol.Core
-                   , TypedProtocol.Codec
-                   , TypedProtocol.Driver
+                   , TypedSession.Core
+                   , TypedSession.Codec
+                   , TypedSession.Driver
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -77,6 +77,7 @@ library
     build-depends: base >= 4.20.0 && < 4.21
                  , containers >= 0.7 && < 0.8
                  , io-classes >= 1.5.0 && < 1.6
+                 , typed-session-state-algorithm
 
     -- Directories containing source files.
     hs-source-dirs:   src

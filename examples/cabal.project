@@ -5,3 +5,9 @@ source-repository-package
   type: git
   location: https://github.com/sdzx-1/fused-effects.git
   tag: ac34a772f13cbba65b453c73be99201b18ac7701
+
+
+source-repository-package
+  type: git
+  location: https://github.com/sdzx-1/typed-session-state-algorithm.git
+  tag: ed9f3fe569d3426a64cf5bcadb1e2bbe57618b39

@@ -26,9 +26,9 @@ import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadThrow (MonadThrow)
 import qualified Data.IntMap as IntMap
 import System.Random (StdGen, split)
-import TypedProtocol.Codec
-import TypedProtocol.Core
-import TypedProtocol.Driver
+import TypedSession.Codec
+import TypedSession.Core
+import TypedSession.Driver
 import Control.Monad.IOSim
 
 mvarsAsChannel

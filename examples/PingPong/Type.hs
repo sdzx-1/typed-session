@@ -35,9 +35,9 @@ import GHC.Exts (dataToTag#)
 import GHC.Int (Int (I#))
 import qualified Network.Socket as Socket
 import qualified Network.Socket.ByteString as Socket
-import TypedProtocol.Codec
-import TypedProtocol.Core
-import TypedProtocol.Driver
+import TypedSession.Codec
+import TypedSession.Core
+import TypedSession.Driver
 
 {-
 

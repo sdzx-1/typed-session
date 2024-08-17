@@ -27,7 +27,7 @@ Some explanations for this diagram:
 4. SendMap aggregates the send functions of multiple Channels together.
 When sending a message, the send function of the receiver is searched from SendMap.
 -}
-module TypedProtocol.Driver where
+module TypedSession.Driver where
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
@@ -36,8 +36,8 @@ import qualified Data.IFunctor as I
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
 import GHC.Exception (Exception)
-import TypedProtocol.Codec
-import TypedProtocol.Core
+import TypedSession.Codec
+import TypedSession.Core
 import Unsafe.Coerce (unsafeCoerce)
 
 {- |

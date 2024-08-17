@@ -16,8 +16,8 @@
 
 module Codec where
 
-import TypedProtocol.Codec
-import TypedProtocol.Core
+import TypedSession.Codec
+import TypedSession.Core
 import qualified Data.ByteString.Lazy as L
 import Data.Binary
 import Data.Binary.Put
@@ -27,7 +27,7 @@ import qualified Network.Socket.ByteString as Socket
 import qualified Data.ByteString.Builder.Extra as L
 import qualified Data.ByteString as BS
 import Type
-import TypedProtocol.Driver
+import TypedSession.Driver
 import Control.Monad.Class.MonadSay (MonadSay (say))
 
 encodeMsg :: Encode Role BookSt L.ByteString
