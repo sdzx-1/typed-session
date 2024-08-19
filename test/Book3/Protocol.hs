@@ -60,6 +60,45 @@ import TypedSession.Core
 
 |]
 
+{-
+-----------------------------------------------Buyer-------------------------Seller------------------------Buyer2
+LABEL 0                                          S0                            S0                           S1 s
+  Title                                         S0->                          ->S0                          S1 s
+  [Branch] Seller                               S2 s                          S2 s                          S1 s
+    * BranchSt NotFound
+    NoBook                                     S2 s<-                    <-S2 NotFound                      S1 s
+    SellerNoBook                           S1 NotFound->                      End                          ->S1 s
+    ~ Terminal                                  End                           End                           End
+    * BranchSt Found
+    Price                                      S2 s<-                      <-S2 Found                       S1 s
+    [Branch] Buyer                              S1 s                          S3 s                          S1 s
+      * BranchSt One
+      OneAfford                               S1 One->                        S3 s                         ->S1 s
+      OneAccept                               S3 One->                       ->S3 s                          S4
+      OneDate                                   S5<-                          <-S5                           S4
+      OneSuccess                                S4->                          End                           ->S4
+      ~ Terminal                                End                           End                           End
+      * BranchSt Two
+      PriceToBuyer2                           S1 Two->                        S3 s                         ->S1 s
+      [Branch] Buyer2                           S6 s                          S3 s                          S6 s
+        * BranchSt NotSupport
+        NotSupport1                            S6 s<-                         S3 s                    <-S6 NotSupport
+        TwoNotBuy                         S3 NotSupport->                    ->S3 s                         End
+        ~ Terminal                              End                           End                           End
+        * BranchSt Support
+        SupportVal                             S6 s<-                         S3 s                      <-S6 Support
+        [Branch] Buyer                          S3 s                          S3 s                          S7 s
+          * BranchSt Enough
+          TwoAccept                         S3 Enough->                      ->S3 s                         S7 s
+          TwoDate                               S8<-                          <-S8                          S7 s
+          TwoSuccess                        S7 Enough->                       End                          ->S7 s
+          ~ Terminal                            End                           End                           End
+          * BranchSt NotEnough
+          TwoNotBuy1                       S3 NotEnough->                    ->S3 s                         S7 s
+          TwoFailed                        S7 NotEnough->                     End                          ->S7 s
+          ~ Terminal                            End                           End                           End
+-}
+
 encodeMsg :: Encode BookRole Book (AnyMsg BookRole Book)
 encodeMsg = Encode $ \x -> case x of
   Title{} -> AnyMsg x

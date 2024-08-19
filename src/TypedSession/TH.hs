@@ -281,6 +281,7 @@ protocol protN roleName bstName =
     Right protCreat -> case piple protCreat of
       Left e -> fail (show e)
       Right pipResult -> do
+        runIO $ putStrLn $ genGraph @r @bst defaultStrFilEnv pipResult
         d1 <- roleDecs roleName
         d2 <- protDecsAndMsgDecs protN roleName bstName pipResult
         pure (d1 ++ d2)
