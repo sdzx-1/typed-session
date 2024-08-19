@@ -69,8 +69,8 @@ addS name =
    in mkName ("S" <> n)
 
 protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipleResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (from, to)} = do
-  s <- newName "s"
+protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (fromVal, toVal)} = do
+  sVar <- newName "s"
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       genConstr i =
@@ -91,12 +91,12 @@ protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (
             if i `Set.member` dnySet
               then
                 ForallC
-                  [KindedTV s SpecifiedSpec (ConT bstName)]
+                  [KindedTV sVar SpecifiedSpec (ConT bstName)]
                   []
                   ( GadtC
                       [mkName $ "SS" <> show i]
                       []
-                      (AppT (ConT protSName) (AppT (PromotedT $ mkName $ "S" <> show i) (VarT s)))
+                      (AppT (ConT protSName) (AppT (PromotedT $ mkName $ "S" <> show i) (VarT sVar)))
                   )
               else
                 GadtC [mkName $ "SS" <> show i] [] (AppT (ConT protSName) (PromotedT $ mkName $ "S" <> show i))
@@ -184,9 +184,9 @@ protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (
   sendVar <- newName "send"
   recvVar <- newName "recv"
   pure $
-    [ DataD [] protName [] Nothing [genConstr i | i <- [from .. to]] []
+    [ DataD [] protName [] Nothing [genConstr i | i <- [fromVal .. toVal]] []
     ]
-      ++ [DataD [] protSName [KindedTV a BndrReq (ConT protName)] Nothing [genSConstr i | i <- [from .. to]] []]
+      ++ [DataD [] protSName [KindedTV a BndrReq (ConT protName)] Nothing [genSConstr i | i <- [fromVal .. toVal]] []]
       ++ [TySynInstD (TySynEqn Nothing (ConT (mkName "Data.IFunctor.Sing")) (ConT protSName))]
       ++ [ InstanceD
             Nothing
@@ -205,7 +205,7 @@ protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (
                 (mkName "sing")
                 [Clause [] (NormalB (ConE (mkName $ "S" <> (if i == -1 then "End" else ("S" <> show i))))) []]
             ]
-         | i <- [from .. to]
+         | i <- [fromVal .. toVal]
          ]
       ++ [ InstanceD
             Nothing
