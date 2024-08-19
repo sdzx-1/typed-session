@@ -16,6 +16,7 @@
 module Book3.Main where
 
 import Book3.Peer
+import Book3.Protocol
 import Book3.Type
 import Control.Carrier.Random.Gen (runRandom)
 import Control.Concurrent.Class.MonadSTM
@@ -24,12 +25,12 @@ import Control.Monad
 import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadThrow (MonadThrow)
+import Control.Monad.IOSim
 import qualified Data.IntMap as IntMap
 import System.Random (StdGen, split)
 import TypedSession.Codec
 import TypedSession.Core
 import TypedSession.Driver
-import Control.Monad.IOSim
 
 mvarsAsChannel
   :: (MonadSTM m)
@@ -42,7 +43,7 @@ mvarsAsChannel bufferRead bufferWrite =
   send x = atomically (putTMVar bufferWrite x)
   recv = atomically (Just <$> takeTMVar bufferRead)
 
-myTracer :: (MonadSay m) => String -> Tracer Role BookSt m
+myTracer :: (MonadSay m) => String -> Tracer BookRole Book m
 myTracer st v = say (st <> show v)
 
 runAll
@@ -56,9 +57,9 @@ runAll
   => StdGen
   -> n ()
 runAll g = do
-  buyerTMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
-  buyer2TMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
-  sellerTMVar <- newEmptyTMVarIO @n @(AnyMsg Role BookSt)
+  buyerTMVar <- newEmptyTMVarIO @n @(AnyMsg BookRole Book)
+  buyer2TMVar <- newEmptyTMVarIO @n @(AnyMsg BookRole Book)
+  sellerTMVar <- newEmptyTMVarIO @n @(AnyMsg BookRole Book)
   let buyerSellerChannel = mvarsAsChannel @n buyerTMVar sellerTMVar
       buyerBuyer2Channel = mvarsAsChannel @n buyerTMVar buyer2TMVar
 
