@@ -66,6 +66,7 @@ library
                    , TypedSession.Core
                    , TypedSession.Codec
                    , TypedSession.Driver
+                   , TypedSession.TH
 
     -- Modules included in this library but not exported.
     -- other-modules:
@@ -77,6 +78,7 @@ library
     build-depends: base >= 4.20.0 && < 4.21
                  , containers >= 0.7 && < 0.8
                  , io-classes >= 1.5.0 && < 1.6
+                 , template-haskell
                  , typed-session-state-algorithm
 
     -- Directories containing source files.
@@ -97,6 +99,7 @@ test-suite typed-session-test
                  , Book1
                  , Book2
                  , Book3.Type
+                 , Book3.Protocol
                  , Book3.Peer
                  , Book3.Main
                  , PingPong
@@ -122,7 +125,8 @@ test-suite typed-session-test
         io-sim,
         random,
         fused-effects,
-        fused-effects-random
+        fused-effects-random,
+        template-haskell
     ghc-options:  -Werror=inaccessible-code -threaded
 
 source-repository head
