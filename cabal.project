@@ -10,4 +10,4 @@ source-repository-package
 source-repository-package
   type: git
   location: https://github.com/sdzx-1/typed-session-state-algorithm.git
-  tag: 5a1d01a6785721599894ffc4416e6ecaa5b1526e
+  tag: 450e8dadbf5050d18e4f1a14905357400f0de787

@@ -33,7 +33,6 @@ import TypedSession.Core
           Msg "Price" ["Int"] Seller Buyer
           Branch Buyer
             BranchSt One 
-              Msg "OneAfford" [] Buyer Buyer2
               Msg "OneAccept" [] Buyer Seller
               Msg "OneDate" ["Int"] Seller Buyer
               Msg "OneSuccess" ["Int"] Buyer Buyer2
@@ -64,39 +63,39 @@ import TypedSession.Core
 -----------------------------------------------Buyer-------------------------Seller------------------------Buyer2
 LABEL 0                                          S0                            S0                           S1 s
   Title                                         S0->                          ->S0                          S1 s
-  [Branch] Seller                               S2 s                          S2 s                          S1 s
+  [Branch Seller]                               S2 s                           S3                           S1 s
     * BranchSt NotFound
-    NoBook                                     S2 s<-                    <-S2 NotFound                      S1 s
+    NoBook                                     S2 s<-                   <-{S2 NotFound}                     S1 s
     SellerNoBook                           S1 NotFound->                      End                          ->S1 s
     ~ Terminal                                  End                           End                           End
     * BranchSt Found
-    Price                                      S2 s<-                      <-S2 Found                       S1 s
-    [Branch] Buyer                              S1 s                          S3 s                          S1 s
+    Price                                      S2 s<-                     <-{S2 Found}                      S1 s
+    [Branch Buyer]                               S7                           S8 s                          S1 s
       * BranchSt One
-      OneAfford                               S1 One->                        S3 s                         ->S1 s
-      OneAccept                               S3 One->                       ->S3 s                          S4
-      OneDate                                   S5<-                          <-S5                           S4
-      OneSuccess                                S4->                          End                           ->S4
+      OneAccept                              {S8 One}->                      ->S8 s                         S1 s
+      OneDate                                  S12<-                         <-S12                          S1 s
+      OneSuccess                              S1 One->                        End                          ->S1 s
       ~ Terminal                                End                           End                           End
       * BranchSt Two
-      PriceToBuyer2                           S1 Two->                        S3 s                         ->S1 s
-      [Branch] Buyer2                           S6 s                          S3 s                          S6 s
+      PriceToBuyer2                          {S1 Two}->                       S8 s                         ->S1 s
+      [Branch Buyer2]                          S13 s                          S8 s                          S14
         * BranchSt NotSupport
-        NotSupport1                            S6 s<-                         S3 s                    <-S6 NotSupport
-        TwoNotBuy                         S3 NotSupport->                    ->S3 s                         End
+        NotSupport1                           S13 s<-                         S8 s                   <-{S13 NotSupport}
+        TwoNotBuy                         S8 NotSupport->                    ->S8 s                         End
         ~ Terminal                              End                           End                           End
         * BranchSt Support
-        SupportVal                             S6 s<-                         S3 s                      <-S6 Support
-        [Branch] Buyer                          S3 s                          S3 s                          S7 s
+        SupportVal                            S13 s<-                         S8 s                    <-{S13 Support}
+        [Branch Buyer]                          S18                           S8 s                         S19 s
           * BranchSt Enough
-          TwoAccept                         S3 Enough->                      ->S3 s                         S7 s
-          TwoDate                               S8<-                          <-S8                          S7 s
-          TwoSuccess                        S7 Enough->                       End                          ->S7 s
+          TwoAccept                        {S8 Enough}->                     ->S8 s                        S19 s
+          TwoDate                              S23<-                         <-S23                         S19 s
+          TwoSuccess                        S19 Enough->                      End                         ->S19 s
           ~ Terminal                            End                           End                           End
           * BranchSt NotEnough
-          TwoNotBuy1                       S3 NotEnough->                    ->S3 s                         S7 s
-          TwoFailed                        S7 NotEnough->                     End                          ->S7 s
+          TwoNotBuy1                      {S8 NotEnough}->                   ->S8 s                        S19 s
+          TwoFailed                       S19 NotEnough->                     End                         ->S19 s
           ~ Terminal                            End                           End                           End
+
 -}
 
 encodeMsg :: Encode BookRole Book (AnyMsg BookRole Book)
@@ -105,7 +104,6 @@ encodeMsg = Encode $ \x -> case x of
   NoBook{} -> AnyMsg x
   SellerNoBook{} -> AnyMsg x
   Price{} -> AnyMsg x
-  OneAfford{} -> AnyMsg x
   OneAccept{} -> AnyMsg x
   OneDate{} -> AnyMsg x
   OneSuccess{} -> AnyMsg x
@@ -135,7 +133,6 @@ instance Show (AnyMsg BookRole Book) where
     NoBook -> "NoBook"
     SellerNoBook -> "SellerNoBook"
     Price i -> "Price " <> show i
-    OneAfford -> "OneAfford"
     OneAccept -> "OneAccept"
     OneDate d -> "OneDate " <> show d
     OneSuccess d -> "OneSuccess" <> show d

@@ -108,7 +108,7 @@ protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (
 
       mkInstanceMsg :: Name -> Protocol (MsgT1 r bst) r bst -> Q [Con]
       mkInstanceMsg s = \case
-        Msg ((a, b, c), (from, to)) constr args _ _ :> prots -> do
+        Msg ((a, b, c), (from, to), _) constr args _ _ :> prots -> do
           let tAnyToType :: T bst -> TH.Type
               tAnyToType = \case
                 TNum i -> PromotedT (mkName $ "S" <> show i)

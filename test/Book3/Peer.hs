@@ -30,14 +30,14 @@ budget = 16
 type Date = Int
 
 data CheckPriceResult :: Book -> Type where
-  Yes :: CheckPriceResult (S3 Enough)
-  No :: CheckPriceResult (S3 NotEnough)
+  Yes :: CheckPriceResult (S8 Enough)
+  No :: CheckPriceResult (S8 NotEnough)
 
 checkPrice
   :: (Has Random sig m)
   => Int
   -> Int
-  -> Peer BookRole Book Buyer m CheckPriceResult (S3 s)
+  -> Peer BookRole Book Buyer m CheckPriceResult S18
 checkPrice _i _h = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -45,13 +45,13 @@ checkPrice _i _h = I.do
     else LiftM $ pure (ireturn No)
 
 data OT :: Book -> Type where
-  OTOne :: OT (S1 One)
+  OTOne :: OT (S8 One)
   OTTwo :: OT (S1 Two)
 
 choiceOT
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer m OT (S1 s)
+  -> Peer BookRole Book Buyer m OT S7
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -70,7 +70,6 @@ buyerPeer = I.do
     Recv (Price i) -> I.do
       choiceOT i I.>>= \case
         OTOne -> I.do
-          yield OneAfford
           yield OneAccept
           Recv (OneDate d) <- await
           yield (OneSuccess d)
@@ -99,13 +98,13 @@ buyerPeer = I.do
             returnAt Nothing
 
 data BuySupp :: Book -> Type where
-  BNS :: BuySupp (S6 NotSupport)
-  BS :: BuySupp (S6 Support)
+  BNS :: BuySupp (S13 NotSupport)
+  BS :: BuySupp (S13 Support)
 
 choiceB
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer2 m BuySupp (S6 s)
+  -> Peer BookRole Book Buyer2 m BuySupp S14
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -118,9 +117,7 @@ buyer2Peer
 buyer2Peer = I.do
   await I.>>= \case
     Recv SellerNoBook -> returnAt Nothing
-    Recv OneAfford -> I.do
-      Recv (OneSuccess d) <- await
-      returnAt (Just d)
+    Recv (OneSuccess d) -> returnAt (Just d)
     Recv (PriceToBuyer2 i) -> I.do
       choiceB i I.>>= \case
         BNS -> I.do
@@ -139,7 +136,7 @@ data FindBookResult :: Book -> Type where
 findBook
   :: (Has Random sig m)
   => String
-  -> Peer BookRole Book Seller m FindBookResult (S2 s)
+  -> Peer BookRole Book Seller m FindBookResult S3
 findBook _st = I.do
   At b <- liftm $ uniform @Bool
   if b
