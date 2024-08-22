@@ -30,14 +30,14 @@ budget = 16
 type Date = Int
 
 data CheckPriceResult :: Book -> Type where
-  Yes :: CheckPriceResult (S8 Enough)
-  No :: CheckPriceResult (S8 NotEnough)
+  Yes :: CheckPriceResult (S5 Enough)
+  No :: CheckPriceResult (S5 NotEnough)
 
 checkPrice
   :: (Has Random sig m)
   => Int
   -> Int
-  -> Peer BookRole Book Buyer m CheckPriceResult S18
+  -> Peer BookRole Book Buyer m CheckPriceResult S8
 checkPrice _i _h = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -45,13 +45,13 @@ checkPrice _i _h = I.do
     else LiftM $ pure (ireturn No)
 
 data OT :: Book -> Type where
-  OTOne :: OT (S8 One)
+  OTOne :: OT (S5 One)
   OTTwo :: OT (S1 Two)
 
 choiceOT
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer m OT S7
+  -> Peer BookRole Book Buyer m OT S4
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -98,13 +98,13 @@ buyerPeer = I.do
             returnAt Nothing
 
 data BuySupp :: Book -> Type where
-  BNS :: BuySupp (S13 NotSupport)
-  BS :: BuySupp (S13 Support)
+  BNS :: BuySupp (S6 NotSupport)
+  BS :: BuySupp (S6 Support)
 
 choiceB
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer2 m BuySupp S14
+  -> Peer BookRole Book Buyer2 m BuySupp S7
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b

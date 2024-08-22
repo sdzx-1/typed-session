@@ -24,14 +24,14 @@ import TypedSession.Core
 [bookProtocol|
   Label 0
     Msg "Title" ["String"] Buyer Seller
-    Branch Seller
-        BranchSt NotFound 
+    Branch Seller {
+        BranchSt NotFound
           Msg "NoBook" [] Seller Buyer
                Msg "SellerNoBook" [] Buyer Buyer2
                Terminal
         BranchSt Found 
           Msg "Price" ["Int"] Seller Buyer
-          Branch Buyer
+          Branch Buyer {
             BranchSt One 
               Msg "OneAccept" [] Buyer Seller
               Msg "OneDate" ["Int"] Seller Buyer
@@ -39,14 +39,14 @@ import TypedSession.Core
               Terminal
             BranchSt Two 
               Msg "PriceToBuyer2" ["Int"] Buyer Buyer2
-              Branch Buyer2
+              Branch Buyer2 {
                 BranchSt NotSupport 
                   Msg "NotSupport1" [] Buyer2 Buyer
                   Msg "TwoNotBuy" [] Buyer Seller
                   Terminal
                 BranchSt Support 
                   Msg "SupportVal" ["Int"] Buyer2 Buyer
-                  Branch Buyer
+                  Branch Buyer {
                     BranchSt Enough 
                       Msg "TwoAccept" [] Buyer Seller
                       Msg "TwoDate" ["Int"] Seller Buyer
@@ -55,7 +55,11 @@ import TypedSession.Core
                     BranchSt NotEnough 
                       Msg "TwoNotBuy1" [] Buyer Seller
                       Msg "TwoFailed" [] Buyer Buyer2
-                      Terminal
+                      Terminal 
+                }
+              }
+          }
+        }
 
 |]
 
@@ -64,37 +68,29 @@ import TypedSession.Core
 LABEL 0                                          S0                            S0                           S1 s
   Title                                         S0->                          ->S0                          S1 s
   [Branch Seller]                               S2 s                           S3                           S1 s
-    * BranchSt NotFound
     NoBook                                     S2 s<-                   <-{S2 NotFound}                     S1 s
-    SellerNoBook                           S1 NotFound->                      End                          ->S1 s
-    ~ Terminal                                  End                           End                           End
-    * BranchSt Found
+      SellerNoBook                         S1 NotFound->                      End                          ->S1 s
+      Terminal                                  End                           End                           End
     Price                                      S2 s<-                     <-{S2 Found}                      S1 s
-    [Branch Buyer]                               S7                           S8 s                          S1 s
-      * BranchSt One
-      OneAccept                              {S8 One}->                      ->S8 s                         S1 s
-      OneDate                                  S12<-                         <-S12                          S1 s
-      OneSuccess                              S1 One->                        End                          ->S1 s
-      ~ Terminal                                End                           End                           End
-      * BranchSt Two
-      PriceToBuyer2                          {S1 Two}->                       S8 s                         ->S1 s
-      [Branch Buyer2]                          S13 s                          S8 s                          S14
-        * BranchSt NotSupport
-        NotSupport1                           S13 s<-                         S8 s                   <-{S13 NotSupport}
-        TwoNotBuy                         S8 NotSupport->                    ->S8 s                         End
-        ~ Terminal                              End                           End                           End
-        * BranchSt Support
-        SupportVal                            S13 s<-                         S8 s                    <-{S13 Support}
-        [Branch Buyer]                          S18                           S8 s                         S19 s
-          * BranchSt Enough
-          TwoAccept                        {S8 Enough}->                     ->S8 s                        S19 s
-          TwoDate                              S23<-                         <-S23                         S19 s
-          TwoSuccess                        S19 Enough->                      End                         ->S19 s
-          ~ Terminal                            End                           End                           End
-          * BranchSt NotEnough
-          TwoNotBuy1                      {S8 NotEnough}->                   ->S8 s                        S19 s
-          TwoFailed                       S19 NotEnough->                     End                         ->S19 s
-          ~ Terminal                            End                           End                           End
+      [Branch Buyer]                             S4                           S5 s                          S1 s
+        OneAccept                            {S5 One}->                      ->S5 s                         S1 s
+          OneDate                              S10<-                         <-S10                          S1 s
+          OneSuccess                          S1 One->                        End                          ->S1 s
+          Terminal                              End                           End                           End
+        PriceToBuyer2                        {S1 Two}->                       S5 s                         ->S1 s
+          [Branch Buyer2]                       S6 s                          S5 s                           S7
+            NotSupport1                        S6 s<-                         S5 s                   <-{S6 NotSupport}
+              TwoNotBuy                   S5 NotSupport->                    ->S5 s                         End
+              Terminal                          End                           End                           End
+            SupportVal                         S6 s<-                         S5 s                     <-{S6 Support}
+              [Branch Buyer]                     S8                           S5 s                          S9 s
+                TwoAccept                  {S5 Enough}->                     ->S5 s                         S9 s
+                  TwoDate                      S11<-                         <-S11                          S9 s
+                  TwoSuccess                S9 Enough->                       End                          ->S9 s
+                  Terminal                      End                           End                           End
+                TwoNotBuy1                {S5 NotEnough}->                   ->S5 s                         S9 s
+                  TwoFailed                S9 NotEnough->                     End                          ->S9 s
+                  Terminal                      End                           End                           End
 
 -}
 
