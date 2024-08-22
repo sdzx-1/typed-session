@@ -7,10 +7,10 @@ module Main (main) where
 import qualified Control.Exception as E
 import Control.Monad (void)
 import Network.Socket
-import Codec
+import Book3.Codec
 import TypedSession.Core
 import qualified TypedSession.Codec as C
-import Type
+import Book3.Type
 import Control.Concurrent.Class.MonadSTM
 import qualified Data.IntMap as IntMap
 import TypedSession.Driver
@@ -18,9 +18,10 @@ import Control.Monad.Class.MonadFork
 import TypedSession.Codec (Decode(..))
 import Control.Effect.Labelled (runLabelledLift)
 import Control.Carrier.Random.Gen (runRandom)
-import Peer
+import Book3.Peer
 import System.Random (newStdGen)
 import Control.Monad.IO.Class (liftIO)
+import Book3.Protocol
 
 main :: IO ()
 main = runTCPServer Nothing "3000"

@@ -14,7 +14,7 @@
 {-# LANGUAGE NamedFieldPuns #-}
 {-# OPTIONS_GHC -Wall #-}
 
-module Codec where
+module Book3.Codec where
 
 import TypedSession.Codec
 import TypedSession.Core
@@ -26,17 +26,17 @@ import qualified Network.Socket as Socket
 import qualified Network.Socket.ByteString as Socket
 import qualified Data.ByteString.Builder.Extra as L
 import qualified Data.ByteString as BS
-import Type
+import Book3.Type
+import Book3.Protocol
 import TypedSession.Driver
 import Control.Monad.Class.MonadSay (MonadSay (say))
 
-encodeMsg :: Encode Role BookSt L.ByteString
+encodeMsg :: Encode BookRole Book L.ByteString
 encodeMsg  = Encode $ \x -> runPut $  case x of
   Title st ->        putWord8 0 >> put st
   NoBook ->          putWord8 1
   SellerNoBook ->    putWord8 2
   Price i ->         putWord8 3 >> put i
-  OneAfford ->       putWord8 4
   OneAccept ->       putWord8 5 
   OneDate i ->       putWord8 6 >> put i
   OneSuccess i ->    putWord8 7 >> put i
@@ -51,7 +51,7 @@ encodeMsg  = Encode $ \x -> runPut $  case x of
   TwoFailed ->       putWord8 16
 
 
-getAnyMsg :: Get (AnyMsg Role BookSt)
+getAnyMsg :: Get (AnyMsg BookRole Book)
 getAnyMsg = do 
   v <- getWord8
   case v of
@@ -63,8 +63,6 @@ getAnyMsg = do
     2 -> pure (AnyMsg  SellerNoBook)
   -- Price i ->         putWord8 3 >> put i
     3 -> get >>= pure . AnyMsg . Price
-  -- OneAfford ->       putWord8 4
-    4 -> pure (AnyMsg OneAfford)
   -- OneAccept ->       putWord8 5 
     5 -> pure (AnyMsg OneAccept)
   -- OneDate i ->       putWord8 6 >> put i
@@ -106,7 +104,7 @@ decodeMsg
   :: DecodeStep
       L.ByteString
       CodecFailure
-      (AnyMsg Role BookSt)
+      (AnyMsg BookRole Book)
 decodeMsg = convertDecoderLBS1 (runGetIncremental getAnyMsg)
 
 socketAsChannel :: Socket.Socket -> Channel IO L.ByteString
@@ -124,5 +122,5 @@ socketAsChannel socket =
         then return Nothing
         else return (Just (L.fromStrict chunk))
 
-myTracer :: (MonadSay m) => String -> Tracer Role BookSt m
+myTracer :: (MonadSay m) => String -> Tracer BookRole Book m
 myTracer st v = say (st <> show v)

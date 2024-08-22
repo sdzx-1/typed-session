@@ -7,11 +7,11 @@ import qualified Control.Exception as E
 import qualified Data.ByteString.Char8 as C
 import Network.Socket
 import Network.Socket.ByteString (recv, sendAll)
-import Codec (socketAsChannel, myTracer, encodeMsg, decodeMsg)
+import Book3.Codec (socketAsChannel, myTracer, encodeMsg, decodeMsg)
 import qualified Data.IntMap as IntMap
 import TypedSession.Core (SingToInt(singToInt))
 import qualified TypedSession.Codec as C
-import Type
+import Book3.Type
 import Control.Concurrent.Class.MonadSTM
 import TypedSession.Driver (driverSimple)
 import Control.Monad.IO.Class (liftIO)
@@ -22,7 +22,8 @@ import Control.Effect.Labelled (runLabelledLift)
 import Control.Carrier.Random.Gen (runRandom)
 import System.Random (newStdGen)
 import Data.Functor (void)
-import Peer
+import Book3.Peer
+import Book3.Protocol
 
 main :: IO ()
 main = runTCPClient "127.0.0.1" "3000" 

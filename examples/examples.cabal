@@ -44,7 +44,8 @@ extra-doc-files:    CHANGELOG.md
 -- Extra source files to be distributed with the package, such as examples, or a tutorial module.
 -- extra-source-files:
 
-executable buyer
+
+library
   build-depends: base
                , typed-session
                , containers
@@ -56,51 +57,61 @@ executable buyer
                , binary
                , bytestring
                , network
+               , template-haskell
+  default-language: Haskell2010
+  hs-source-dirs: src
+  exposed-modules: Book3.Type
+                 , Book3.Peer
+                 , Book3.Codec
+                 , Book3.Protocol
+
+executable buyer
+  build-depends: base
+               , fused-effects
+               , typed-session
+               , io-classes
+               , io-sim
+               , random
+               , containers
+               , fused-effects-random
+               , network
+               , examples
   main-is: Buyer.hs
   default-language: Haskell2010
   hs-source-dirs: Book3
-  other-modules: Type
-               , Peer
-               , Codec
 
 
 executable seller
   build-depends: base
+               , fused-effects
                , typed-session
-               , containers
                , io-classes
                , io-sim
                , random
-               , fused-effects
+               , containers
                , fused-effects-random
-               , binary
-               , bytestring
                , network
+               , examples
+               , bytestring
   main-is: Seller.hs
   default-language: Haskell2010
   hs-source-dirs: Book3
-  other-modules: Type
-               , Peer
-               , Codec
 
 executable buyer2
   build-depends: base
+               , fused-effects
                , typed-session
-               , containers
                , io-classes
                , io-sim
                , random
-               , fused-effects
+               , containers
                , fused-effects-random
-               , binary
-               , bytestring
                , network
+               , examples
+               , bytestring
   main-is: Buyer2.hs
   default-language: Haskell2010
   hs-source-dirs: Book3
-  other-modules: Type
-               , Peer
-               , Codec
 
 
 executable server
