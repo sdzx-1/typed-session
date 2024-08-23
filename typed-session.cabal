@@ -20,7 +20,7 @@ name:               typed-session
 -- PVP summary:     +-+------- breaking API changes
 --                  | | +----- non-breaking API additions
 --                  | | | +--- code changes with no API change
-version:            0.1.0.0
+version:            0.1.1.0
 
 -- A short (one-line) description of the package.
 synopsis: typed session framework
@@ -78,8 +78,8 @@ library
     build-depends: base >= 4.20.0 && < 4.21
                  , containers >= 0.7 && < 0.8
                  , io-classes >= 1.5.0 && < 1.6
-                 , template-haskell
-                 , typed-session-state-algorithm
+                 , template-haskell >= 2.22.0 && < 2.23
+                 , typed-session-state-algorithm >= 0.1.0 && < 0.2
 
     -- Directories containing source files.
     hs-source-dirs:   src
