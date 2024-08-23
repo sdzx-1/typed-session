@@ -9,7 +9,9 @@ import Control.Monad (void)
 import Control.Monad.Class.MonadFork
 import qualified Data.IntMap as IntMap
 import Network.Socket
-import Type (SRole (..), clientPeer, decodeMsg, encodeMsg, myTracer, socketAsChannel)
+import PingPong.Type 
+import PingPong.Protocol 
+import PingPong.Peer 
 import TypedSession.Codec (Decode (..))
 import qualified TypedSession.Codec as C
 import TypedSession.Core

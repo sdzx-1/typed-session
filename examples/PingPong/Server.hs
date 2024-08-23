@@ -3,7 +3,9 @@ module Main where
 import qualified Control.Exception as E
 import qualified Data.IntMap as IntMap
 import Network.Socket
-import Type
+import PingPong.Type 
+import PingPong.Protocol 
+import PingPong.Peer 
 import qualified TypedSession.Codec as C
 import TypedSession.Core (singToInt)
 import Control.Concurrent.Class.MonadSTM
