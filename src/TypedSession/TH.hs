@@ -133,12 +133,15 @@ protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (
                     )
                     (AppT (AppT (PromotedTupleT 2) (PromotedT (mkName (show to)))) (tAnyToType c))
                 )
-
           let val =
                 let gadtc =
                       GadtC
                         [mkName constr]
-                        [ (Bang NoSourceUnpackedness NoSourceStrictness, ConT (mkName ag))
+                        [ ( Bang NoSourceUnpackedness NoSourceStrictness
+                          , case words ag of
+                              [] -> error "np"
+                              (x : xs) -> foldl' AppT (ConT (mkName x)) (map (ConT . mkName) xs)
+                          )
                         | ag <- args
                         ]
                         mkTName
