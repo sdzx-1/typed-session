@@ -47,6 +47,9 @@ encodeMsg = Encode $ \x -> runPut $ case x of
   AddOne -> putWord8 3
   CStop -> putWord8 4
   Recved -> putWord8 5
+  Check i -> putWord8 6 >> put i
+  CheckResult i -> putWord8 7 >> put i
+  CheckResultS i -> putWord8 8 >> put i
 
 getAnyMsg :: Get (AnyMsg PingPongRole PingPong)
 getAnyMsg = do
@@ -58,6 +61,15 @@ getAnyMsg = do
     3 -> pure (AnyMsg AddOne)
     4 -> pure (AnyMsg CStop)
     5 -> pure (AnyMsg Recved)
+    6 -> do
+      i <- get
+      pure (AnyMsg $ Check i)
+    7 -> do
+      i <- get
+      pure (AnyMsg $ CheckResult i)
+    8 -> do
+      i <- get
+      pure (AnyMsg $ CheckResultS i)
     i -> error $ "undefined index: " ++ show i
 
 convertDecoderLBS1
@@ -99,20 +111,29 @@ myTracer :: (MonadSay m) => String -> Tracer PingPongRole PingPong m
 myTracer st v = say (st <> show v)
 
 data Choice :: PingPong -> Type where
+  SCheck :: Choice (S2 CheckVal)
   ST :: Choice (S2 STrue)
   SF :: Choice (S1 SFalse)
 
 choice :: (Monad m) => Int -> Peer PingPongRole PingPong Client m Choice S0
 choice i =
-  if i <= 5
-    then LiftM $ pure (ireturn ST)
-    else LiftM $ pure (ireturn SF)
+  if i `mod` 10 == 1
+    then LiftM $ pure (ireturn SCheck)
+    else
+      if i <= 50
+        then LiftM $ pure (ireturn ST)
+        else LiftM $ pure (ireturn SF)
 
 clientPeer
   :: (Monad m) => Int -> Peer PingPongRole PingPong Client m (At () (Done Client)) S0
 clientPeer i = I.do
   res <- choice i
   case res of
+    SCheck -> I.do
+      yield (Check i)
+      Recv (CheckResult b) <- await
+      yield (CheckResultS b)
+      clientPeer (i + 1)
     ST -> I.do
       yield AddOne
       Recv Recved <- await
@@ -131,6 +152,7 @@ serverPeer = I.do
     Ping -> I.do
       yield Pong
       serverPeer
+    CheckResultS _b -> serverPeer
     Stop -> returnAt ()
 
 counterPeer
@@ -138,6 +160,9 @@ counterPeer
 counterPeer i = I.do
   Recv msg <- await
   case msg of
+    Check _i -> I.do
+      yield (CheckResult True)
+      counterPeer i
     AddOne -> I.do
       liftm $ liftIO $ putStrLn $ "counter val: " <> show i
       yield Recved

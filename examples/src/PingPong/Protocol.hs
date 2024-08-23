@@ -8,6 +8,8 @@
 {-# LANGUAGE QuasiQuotes #-}
 {-# LANGUAGE TemplateHaskell #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# OPTIONS_GHC -Wall #-}
+{-# OPTIONS_GHC -Wno-orphans #-}
 
 module PingPong.Protocol where
 
@@ -20,6 +22,11 @@ import TypedSession.Core
 
   Label 0
     Branch Client {
+      BranchSt CheckVal
+          Msg "Check" ["Int"] Client Counter
+          Msg "CheckResult" ["Bool"] Counter Client
+          Msg "CheckResultS" ["Bool"] Client Server
+          Goto 0
       BranchSt STrue
           Msg "AddOne" [] Client Counter
           Msg "Recved" [] Counter Client
@@ -42,3 +49,6 @@ instance Show (AnyMsg PingPongRole PingPong) where
     AddOne -> "AddOne"
     CStop -> "CStop"
     Recved -> "Recved"
+    Check i -> "CheckValue " ++ show i
+    CheckResult b -> "CheckResult " ++ show b
+    CheckResultS b -> "ChcckResultS " ++ show b
