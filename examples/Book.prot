@@ -1,0 +1,30 @@
+-----------------------------------------------Buyer-------------------------Seller------------------------Buyer2
+LABEL 0                                          S0                            S0                           S1 s
+  Title                                         S0->                          ->S0                          S1 s
+  [Branch Seller]                               S2 s                           S3                           S1 s
+    FinishBuyer                                S2 s<-                    <-{S2 Finish}                      S1 s
+      FinishBuyer2                          S1 Finish->                       End                          ->S1 s
+      Terminal                                  End                           End                           End
+    NoBook                                     S2 s<-                   <-{S2 NotFound}                     S1 s
+      SellerNoBook                         S1 NotFound->                       S0                          ->S1 s
+      Goto 0                                     S0                            S0                           S1 s
+    Price                                      S2 s<-                     <-{S2 Found}                      S1 s
+      [Branch Buyer]                             S4                           S5 s                          S1 s
+        OneAccept                            {S5 One}->                      ->S5 s                         S1 s
+          OneDate                              S10<-                         <-S10                          S1 s
+          OneSuccess                          S1 One->                         S0                          ->S1 s
+          Goto 0                                 S0                            S0                           S1 s
+        PriceToBuyer2                        {S1 Two}->                       S5 s                         ->S1 s
+          [Branch Buyer2]                       S6 s                          S5 s                           S7
+            NotSupport1                        S6 s<-                         S5 s                   <-{S6 NotSupport}
+              TwoNotBuy                   S5 NotSupport->                    ->S5 s                         S1 s
+              Goto 0                             S0                            S0                           S1 s
+            SupportVal                         S6 s<-                         S5 s                     <-{S6 Support}
+              [Branch Buyer]                     S8                           S5 s                          S9 s
+                TwoAccept                  {S5 Enough}->                     ->S5 s                         S9 s
+                  TwoDate                      S11<-                         <-S11                          S9 s
+                  TwoSuccess                S9 Enough->                        S0                          ->S9 s
+                  Goto 0                         S0                            S0                           S1 s
+                TwoNotBuy1                {S5 NotEnough}->                   ->S5 s                         S9 s
+                  TwoFailed                S9 NotEnough->                      S0                          ->S9 s
+                  Goto 0                         S0                            S0                           S1 s

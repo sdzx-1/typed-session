@@ -281,7 +281,10 @@ protocol protN roleName bstName =
     Right protCreat -> case piple protCreat of
       Left e -> fail (show e)
       Right pipResult -> do
-        runIO $ putStrLn $ genGraph @r @bst defaultStrFilEnv pipResult
+        let graphStr = genGraph @r @bst defaultStrFilEnv pipResult
+        runIO $ do
+          writeFile (protN <> ".prot") graphStr
+          putStrLn graphStr
         d1 <- roleDecs roleName
         d2 <- protDecsAndMsgDecs protN roleName bstName pipResult
         pure (d1 ++ d2)
