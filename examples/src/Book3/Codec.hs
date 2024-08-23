@@ -49,6 +49,8 @@ encodeMsg  = Encode $ \x -> runPut $  case x of
   TwoSuccess i ->    putWord8 14 >> put i
   TwoNotBuy1 ->      putWord8 15
   TwoFailed ->       putWord8 16
+  FinishBuyer ->      putWord8 17
+  FinishBuyer2 ->       putWord8 18
 
 
 getAnyMsg :: Get (AnyMsg BookRole Book)
@@ -87,6 +89,8 @@ getAnyMsg = do
     15 -> pure (AnyMsg TwoNotBuy1)
   -- TwoFailed ->       putWord8 16
     16 -> pure (AnyMsg TwoFailed)
+    17 -> pure (AnyMsg FinishBuyer)
+    18 -> pure (AnyMsg FinishBuyer2)
     i -> error $ "undefined index: " ++ show i
 
 convertDecoderLBS1 :: Decoder a 

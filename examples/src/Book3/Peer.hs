@@ -12,16 +12,19 @@
 {-# LANGUAGE ScopedTypeVariables #-}
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
+{-# LANGUAGE TypeOperators #-}
+{-# OPTIONS_GHC -Wall #-}
 
 module Book3.Peer where
 
-import Control.Algebra (Has)
+import Book3.Protocol
+import Book3.Type
+import Control.Algebra (Has, (:+:))
 import Control.Effect.Random (Random, uniform)
+import Control.Effect.State
 import Data.IFunctor (At (..), ireturn, returnAt)
 import qualified Data.IFunctor as I
 import Data.Kind
-import Book3.Protocol
-import Book3.Type
 import TypedSession.Core
 
 budget :: Int
@@ -64,6 +67,9 @@ buyerPeer
 buyerPeer = I.do
   yield (Title "haskell book")
   await I.>>= \case
+    Recv FinishBuyer -> I.do
+       yield FinishBuyer2
+       returnAt Nothing
     Recv NoBook -> I.do
       yield SellerNoBook
       buyerPeer
@@ -95,7 +101,7 @@ buyerPeer = I.do
           No -> I.do
             yield TwoNotBuy1
             yield TwoFailed
-            returnAt Nothing
+            buyerPeer
 
 data BuySupp :: Book -> Type where
   BNS :: BuySupp (S6 NotSupport)
@@ -116,6 +122,7 @@ buyer2Peer
   => Peer BookRole Book Buyer2 m (At (Maybe Date) (Done Buyer2)) (S1 s)
 buyer2Peer = I.do
   await I.>>= \case
+    Recv FinishBuyer2 -> returnAt Nothing
     Recv SellerNoBook -> buyer2Peer
     Recv (OneSuccess d) -> buyer2Peer
     Recv (PriceToBuyer2 i) -> I.do
@@ -127,28 +134,36 @@ buyer2Peer = I.do
           yield (SupportVal (i `div` 2))
           await I.>>= \case
             Recv (TwoSuccess d) -> buyer2Peer
-            Recv TwoFailed -> returnAt Nothing
+            Recv TwoFailed -> buyer2Peer
 
 data FindBookResult :: Book -> Type where
   NotFound' :: FindBookResult (S2 NotFound)
   Found' :: FindBookResult (S2 Found)
+  Finish' :: FindBookResult (S2 Finish)
 
 findBook
-  :: (Has Random sig m)
+  :: (Has (Random :+: State Int) sig m)
   => String
   -> Peer BookRole Book Seller m FindBookResult S3
 findBook _st = I.do
-  At b <- liftm $ uniform @Bool
-  if b
-    then LiftM $ pure (ireturn Found')
-    else LiftM $ pure (ireturn NotFound')
+  At i <- liftm $ get @Int
+  if i > 30
+    then LiftM $ pure (ireturn Finish')
+    else I.do
+      At b <- liftm $ uniform @Bool
+      if b
+        then LiftM $ pure (ireturn Found')
+        else LiftM $ pure (ireturn NotFound')
 
 sellerPeer
-  :: (Has Random sig m)
+  :: (Has (Random :+: State Int) sig m)
   => Peer BookRole Book Seller m (At () (Done Seller)) S0
 sellerPeer = I.do
+  liftm $ modify @Int (+ 1)
   Recv (Title st) <- await
   findBook st I.>>= \case
+    Finish' -> I.do
+      yield FinishBuyer
     NotFound' -> I.do
       yield NoBook
       sellerPeer
@@ -162,4 +177,4 @@ sellerPeer = I.do
         Recv TwoAccept -> I.do
           yield (TwoDate 100)
           sellerPeer
-        Recv TwoNotBuy1 -> returnAt ()
+        Recv TwoNotBuy1 -> sellerPeer

@@ -30,7 +30,8 @@ data BookRole = Buyer | Seller | Buyer2
   deriving (Show, Eq, Ord, Enum, Bounded)
 
 data BookBranchSt
-  = NotFound
+  = Finish
+  | NotFound
   | Found
   | One
   | Two

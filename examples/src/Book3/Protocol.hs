@@ -11,6 +11,7 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
+{-# OPTIONS_GHC -ddump-splices #-}
 
 module Book3.Protocol where
 
@@ -25,6 +26,10 @@ import TypedSession.Core
   Label 0
     Msg "Title" ["String"] Buyer Seller
     Branch Seller {
+        BranchSt Finish
+          Msg "FinishBuyer" [] Seller Buyer
+          Msg "FinishBuyer2" [] Buyer Buyer2
+          Terminal
         BranchSt NotFound
           Msg "NoBook" [] Seller Buyer
                Msg "SellerNoBook" [] Buyer Buyer2
@@ -55,7 +60,7 @@ import TypedSession.Core
                     BranchSt NotEnough 
                       Msg "TwoNotBuy1" [] Buyer Seller
                       Msg "TwoFailed" [] Buyer Buyer2
-                      Terminal
+                      Goto 0
                 }
               }
           }
@@ -112,3 +117,5 @@ instance Show (AnyMsg BookRole Book) where
     TwoSuccess d -> "TwoSuccess " <> show d
     TwoNotBuy1 -> "TwoNotBuy1"
     TwoFailed -> "TwoFailed"
+    FinishBuyer -> "FinishBuyer"
+    FinishBuyer2 -> "FinishBuyer2"
