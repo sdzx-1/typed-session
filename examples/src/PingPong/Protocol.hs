@@ -25,13 +25,11 @@ import TypedSession.Core
       BranchSt CheckVal
           Msg "Check" ["Int"] Client Counter
           Msg "CheckResult" ["Bool"] Counter Client
-          Msg "CheckResultS" ["Bool"] Client Server
           Goto 0
       BranchSt STrue
-          Msg "AddOne" [] Client Counter
-          Msg "Recved" [] Counter Client
           Msg "Ping" [] Client Server
           Msg "Pong" [] Server Client
+          Msg "AddOne" [] Client Counter
           Goto 0
       BranchSt SFalse
           Msg "Stop" [] Client Server
@@ -48,7 +46,5 @@ instance Show (AnyMsg PingPongRole PingPong) where
     Stop -> "Stop"
     AddOne -> "AddOne"
     CStop -> "CStop"
-    Recved -> "Recved"
     Check i -> "CheckValue " ++ show i
     CheckResult b -> "CheckResult " ++ show b
-    CheckResultS b -> "ChcckResultS " ++ show b

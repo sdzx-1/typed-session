@@ -3,12 +3,10 @@ LABEL 0                                          S0                           S1
   [Branch Client]                                S0                           S1 s                          S2 s
     Check                                 {S2 CheckVal}->                     S1 s                         ->S2 s
       CheckResult                               S3<-                          S1 s                          <-S3
-      CheckResultS                         S1 CheckVal->                     ->S1 s                         S2 s
       Goto 0                                     S0                           S1 s                          S2 s
-    AddOne                                  {S2 STrue}->                      S1 s                         ->S2 s
-      Recved                                    S4<-                          S1 s                          <-S4
-      Ping                                   S1 STrue->                      ->S1 s                         S2 s
-      Pong                                      S5<-                          <-S5                          S2 s
+    Ping                                    {S1 STrue}->                     ->S1 s                         S2 s
+      Pong                                      S4<-                          <-S4                          S2 s
+      AddOne                                 S2 STrue->                       S1 s                         ->S2 s
       Goto 0                                     S0                           S1 s                          S2 s
     Stop                                   {S1 SFalse}->                     ->S1 s                         S2 s
       CStop                                 S2 SFalse->                       End                          ->S2 s

@@ -46,10 +46,8 @@ encodeMsg = Encode $ \x -> runPut $ case x of
   Stop -> putWord8 2
   AddOne -> putWord8 3
   CStop -> putWord8 4
-  Recved -> putWord8 5
   Check i -> putWord8 6 >> put i
   CheckResult i -> putWord8 7 >> put i
-  CheckResultS i -> putWord8 8 >> put i
 
 getAnyMsg :: Get (AnyMsg PingPongRole PingPong)
 getAnyMsg = do
@@ -60,16 +58,12 @@ getAnyMsg = do
     2 -> pure (AnyMsg Stop)
     3 -> pure (AnyMsg AddOne)
     4 -> pure (AnyMsg CStop)
-    5 -> pure (AnyMsg Recved)
     6 -> do
       i <- get
       pure (AnyMsg $ Check i)
     7 -> do
       i <- get
       pure (AnyMsg $ CheckResult i)
-    8 -> do
-      i <- get
-      pure (AnyMsg $ CheckResultS i)
     i -> error $ "undefined index: " ++ show i
 
 convertDecoderLBS1
@@ -112,7 +106,7 @@ myTracer st v = say (st <> show v)
 
 data Choice :: PingPong -> Type where
   SCheck :: Choice (S2 CheckVal)
-  ST :: Choice (S2 STrue)
+  ST :: Choice (S1 STrue)
   SF :: Choice (S1 SFalse)
 
 choice :: (Monad m) => Int -> Peer PingPongRole PingPong Client m Choice S0
@@ -131,14 +125,12 @@ clientPeer i = I.do
   case res of
     SCheck -> I.do
       yield (Check i)
-      Recv (CheckResult b) <- await
-      yield (CheckResultS b)
+      Recv (CheckResult _b) <- await
       clientPeer (i + 1)
     ST -> I.do
-      yield AddOne
-      Recv Recved <- await
       yield Ping
       Recv Pong <- await
+      yield AddOne
       clientPeer (i + 1)
     SF -> I.do
       yield Stop
@@ -152,7 +144,6 @@ serverPeer = I.do
     Ping -> I.do
       yield Pong
       serverPeer
-    CheckResultS _b -> serverPeer
     Stop -> returnAt ()
 
 counterPeer
@@ -165,6 +156,5 @@ counterPeer i = I.do
       counterPeer i
     AddOne -> I.do
       liftm $ liftIO $ putStrLn $ "counter val: " <> show i
-      yield Recved
       counterPeer (i + 1)
     CStop -> returnAt ()
