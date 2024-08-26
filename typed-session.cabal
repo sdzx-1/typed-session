@@ -79,7 +79,7 @@ library
                  , containers >= 0.7 && < 0.8
                  , io-classes >= 1.5.0 && < 1.6
                  , template-haskell >= 2.22.0 && < 2.23
-                 , typed-session-state-algorithm >= 0.1.0 && < 0.2
+                 , typed-session-state-algorithm >= 0.3.0 && < 0.4
 
     -- Directories containing source files.
     hs-source-dirs:   src

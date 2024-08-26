@@ -22,9 +22,8 @@ import qualified Data.Set as Set
 import Language.Haskell.TH hiding (Type)
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
-import TypedSession.State.GenDoc
 import TypedSession.State.Parser (runProtocolParser)
-import TypedSession.State.Piple (PipleResult (..), piple)
+import TypedSession.State.Pipeline (PipleResult (..), pipe, genGraph)
 import TypedSession.State.Render
 import TypedSession.State.Type (BranchSt (..), Creat, MsgOrLabel (..), MsgT1, Protocol (..), ProtocolError, T (..))
 
@@ -281,7 +280,7 @@ protocol protN roleName bstName =
   parseOrThrow :: String -> Q [Dec]
   parseOrThrow st = case runProtocolParser @r @bst st of
     Left e -> fail (show e)
-    Right protCreat -> case piple protCreat of
+    Right protCreat -> case pipe protCreat of
       Left e -> fail (show e)
       Right pipResult -> do
         let graphStr = genGraph @r @bst defaultStrFilEnv pipResult
