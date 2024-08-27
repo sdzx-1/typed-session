@@ -23,7 +23,7 @@ import Language.Haskell.TH hiding (Type)
 import qualified Language.Haskell.TH as TH
 import Language.Haskell.TH.Quote
 import TypedSession.State.Parser (runProtocolParser)
-import TypedSession.State.Pipeline (PipleResult (..), pipe, genGraph)
+import TypedSession.State.Pipeline (PipeResult (..), genGraph, pipe)
 import TypedSession.State.Render
 import TypedSession.State.Type (BranchSt (..), Creat, MsgOrLabel (..), MsgT1, Protocol (..), ProtocolError, T (..))
 
@@ -67,8 +67,8 @@ addS name =
   let n = (nameBase name)
    in mkName ("S" <> n)
 
-protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipleResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipleResult{msgT1, dnySet, stBound = (fromVal, toVal)} = do
+protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal)} = do
   sVar <- newName "s"
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
@@ -283,7 +283,7 @@ protocol protN roleName bstName =
     Right protCreat -> case pipe protCreat of
       Left e -> fail (show e)
       Right pipResult -> do
-        let graphStr = genGraph @r @bst defaultStrFilEnv pipResult
+        let graphStr = genGraph @r @bst pipResult
         runIO $ do
           writeFile (protN <> ".prot") graphStr
           putStrLn graphStr
