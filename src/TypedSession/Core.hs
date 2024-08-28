@@ -253,5 +253,5 @@ Note that the state of `ts` has not changed.
 liftm :: (Functor m) => m a -> Peer role' ps r m (At a ts) ts
 liftm m = LiftM (returnAt <$> m)
 
-liftConstruct :: (Applicative m) => ia st' -> Peer role' k r m ia st
-liftConstruct a = LiftM $ pure $ ireturn a
+liftConstructor :: (Applicative m) => ia st' -> Peer role' k r m ia st
+liftConstructor a = LiftM $ pure $ ireturn a
