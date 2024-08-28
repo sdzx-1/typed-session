@@ -31,6 +31,7 @@ import System.Random (StdGen, split)
 import TypedSession.Codec
 import TypedSession.Core
 import TypedSession.Driver
+import Control.Monad.Class.MonadTimer (MonadDelay)
 
 mvarsAsChannel
   :: (MonadSTM m)
@@ -53,6 +54,7 @@ runAll
      , MonadSay n
      , MonadThrow n
      , MonadFork n
+     , MonadDelay n
      )
   => StdGen
   -> n ()

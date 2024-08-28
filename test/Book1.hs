@@ -31,6 +31,7 @@ import GHC.Int (Int (I#))
 import TypedSession.Codec
 import TypedSession.Core
 import TypedSession.Driver
+import Control.Monad.Class.MonadTimer (MonadDelay)
 
 {-
 
@@ -235,7 +236,7 @@ instance Show (AnyMsg Role BookSt) where
     Date i -> "Date " <> show i
     NotBuy -> "NotBuy"
 
-runAll :: forall m. (Monad m, MonadSTM m, MonadSay m, MonadFork m, MonadThrow m) => m ()
+runAll :: forall m. (Monad m, MonadDelay m, MonadSTM m, MonadSay m, MonadFork m, MonadThrow m) => m ()
 runAll = do
   buyerTMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)
   buyer2TMVar <- newEmptyTMVarIO @m @(AnyMsg Role BookSt)

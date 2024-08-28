@@ -22,6 +22,7 @@ import Control.Monad
 import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadSay
 import Control.Monad.Class.MonadThrow (MonadThrow)
+import Control.Monad.Class.MonadTimer (MonadDelay)
 import Data.IFunctor (At (..), Sing, SingI, ireturn, returnAt)
 import qualified Data.IFunctor as I
 import qualified Data.IntMap as IntMap
@@ -169,7 +170,7 @@ instance Show (AnyMsg Role PingPong) where
     Pong i -> "Pong " <> show i
     Stop -> "Stop"
 
-runAll :: forall m. (Monad m, MonadSTM m, MonadSay m, MonadFork m, MonadThrow m) => m ()
+runAll :: forall m. (Monad m, MonadDelay m, MonadSTM m, MonadSay m, MonadFork m, MonadThrow m) => m ()
 runAll = do
   clientTMVar <- newEmptyTMVarIO @m @(AnyMsg Role PingPong)
   serverTMVar <- newEmptyTMVarIO @m @(AnyMsg Role PingPong)
