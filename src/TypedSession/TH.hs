@@ -196,7 +196,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
                       GadtC
                         [mkName constr]
                         [ ( Bang NoSourceUnpackedness NoSourceStrictness
-                          , case words ag of
+                          , case ag of
                               [] -> error "np"
                               (x : xs) -> foldl' AppT (ConT (mkName x)) (map (ConT . mkName) xs)
                           )
@@ -209,8 +209,8 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
           vals <- mkDataInstanceMsg s prots
           pure (val : vals)
         Label _ _ :> prots -> mkDataInstanceMsg s prots
-        Branch _ _ ls -> do
-          ls' <- forM ls $ \(BranchSt _ _ prot) -> mkDataInstanceMsg s prot
+        Branch _ _ _ ls -> do
+          ls' <- forM ls $ \(BranchSt _ _ _ prot) -> mkDataInstanceMsg s prot
           pure $ concat ls'
         _ -> pure []
 
