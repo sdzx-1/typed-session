@@ -26,7 +26,7 @@ import TypedSession.TH
 data PingPongRole = Client | Server | Counter
   deriving (Show, Eq, Ord, Enum, Bounded)
 
-data PingPongBranchSt = STrue | SFalse | CheckVal
+data PingPongBranchSt = Continue | Finish | CheckVal
   deriving (Show, Read, Eq, Ord, Enum, Bounded)
 
 pingpongProtocl :: QuasiQuoter

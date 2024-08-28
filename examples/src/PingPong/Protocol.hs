@@ -19,19 +19,19 @@ import TypedSession.Core
 [pingpongProtocl|
 
   Label 0
-    Branch Client {
-      BranchSt CheckVal
-          Msg "Check" ["Int"] Client Counter
-          Msg "CheckResult" ["Bool"] Counter Client
+    Branch Client ChoiceNextAction {
+      BranchSt CheckVal []
+          Msg Check [Int] Client Counter
+          Msg CheckResult [Bool] Counter Client
           Goto 0
-      BranchSt STrue
-          Msg "Ping" [] Client Server
-          Msg "Pong" [] Server Client
-          Msg "AddOne" [] Client Counter
+      BranchSt Continue []
+          Msg Ping [] Client Server
+          Msg Pong [] Server Client
+          Msg AddOne [] Client Counter
           Goto 0
-      BranchSt SFalse
-          Msg "Stop" [] Client Server
-          Msg "CStop" [] Client Counter
+      BranchSt Finish []
+          Msg Stop [] Client Server
+          Msg CStop [] Client Counter
           Terminal
     }
 

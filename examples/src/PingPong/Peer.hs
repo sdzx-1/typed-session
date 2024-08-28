@@ -20,7 +20,6 @@
 module PingPong.Peer where
 
 import Control.Monad.Class.MonadSay
-import Control.Monad.Class.MonadTimer (threadDelay)
 import Control.Monad.IO.Class (MonadIO, liftIO)
 import Data.Binary
 import Data.Binary.Get
@@ -103,35 +102,30 @@ socketAsChannel socket =
 myTracer :: (MonadSay m) => String -> Tracer PingPongRole PingPong m
 myTracer st v = say (st <> show v)
 
-data Choice :: PingPong -> Type where
-  SCheck :: Choice (S2 CheckVal)
-  ST :: Choice (S1 STrue)
-  SF :: Choice (S1 SFalse)
-
-choice :: (Monad m) => Int -> Peer PingPongRole PingPong Client m Choice S0
+choice :: (Monad m) => Int -> Peer PingPongRole PingPong Client m ChoiceNextAction S0
 choice i =
   if i `mod` 10 == 1
-    then LiftM $ pure (ireturn SCheck)
+    then liftConstructor BranchSt_CheckVal
     else
       if i <= 50
-        then LiftM $ pure (ireturn ST)
-        else LiftM $ pure (ireturn SF)
+        then liftConstructor BranchSt_Continue
+        else liftConstructor BranchSt_Finish
 
 clientPeer
   :: (Monad m) => Int -> Peer PingPongRole PingPong Client m (At () (Done Client)) S0
 clientPeer i = I.do
   res <- choice i
   case res of
-    SCheck -> I.do
+    BranchSt_CheckVal -> I.do
       yield (Check i)
       Recv (CheckResult _b) <- await
       clientPeer (i + 1)
-    ST -> I.do
+    BranchSt_Continue -> I.do
       yield Ping
       Recv Pong <- await
       yield AddOne
       clientPeer (i + 1)
-    SF -> I.do
+    BranchSt_Finish -> I.do
       yield Stop
       yield CStop
 

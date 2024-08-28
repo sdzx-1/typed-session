@@ -24,42 +24,42 @@ import TypedSession.Core
 
 [bookProtocol|
   Label 0
-    Msg "Title" ["String"] Buyer Seller
-    Branch Seller {
-        BranchSt Finish
-          Msg "FinishBuyer" [] Seller Buyer
-          Msg "FinishBuyer2" [] Buyer Buyer2
+    Msg Title [String] Buyer Seller
+    Branch Seller ChoiceAction{
+        BranchSt Finish []
+          Msg FinishBuyer [] Seller Buyer
+          Msg FinishBuyer2 [] Buyer Buyer2
           Terminal
-        BranchSt NotFound
-          Msg "NoBook" [] Seller Buyer
-               Msg "SellerNoBook" [] Buyer Buyer2
+        BranchSt NotFound []
+          Msg NoBook [] Seller Buyer
+               Msg SellerNoBook [] Buyer Buyer2
                Goto 0
-        BranchSt Found 
-          Msg "Price" ["Int"] Seller Buyer
-          Branch Buyer {
-            BranchSt One 
-              Msg "OneAccept" [] Buyer Seller
-              Msg "OneDate" ["Int"] Seller Buyer
-              Msg "OneSuccess" ["Int"] Buyer Buyer2
+        BranchSt Found []
+          Msg Price [Int] Seller Buyer
+          Branch Buyer OneOrTwo {
+            BranchSt One []
+              Msg OneAccept [] Buyer Seller
+              Msg OneDate [Int] Seller Buyer
+              Msg OneSuccess [Int] Buyer Buyer2
               Goto 0
-            BranchSt Two 
-              Msg "PriceToBuyer2" ["Int"] Buyer Buyer2
-              Branch Buyer2 {
-                BranchSt NotSupport 
-                  Msg "NotSupport1" [] Buyer2 Buyer
-                  Msg "TwoNotBuy" [] Buyer Seller
+            BranchSt Two []
+              Msg PriceToBuyer2 [Int] Buyer Buyer2
+              Branch Buyer2 SupportOrNotSupport {
+                BranchSt NotSupport []
+                  Msg NotSupport1 [] Buyer2 Buyer
+                  Msg TwoNotBuy [] Buyer Seller
                   Goto 0
-                BranchSt Support 
-                  Msg "SupportVal" ["Int"] Buyer2 Buyer
-                  Branch Buyer {
-                    BranchSt Enough 
-                      Msg "TwoAccept" [] Buyer Seller
-                      Msg "TwoDate" ["Int"] Seller Buyer
-                      Msg "TwoSuccess" ["Int"] Buyer Buyer2
+                BranchSt Support []
+                  Msg SupportVal [Int] Buyer2 Buyer
+                  Branch Buyer EnoughtOrNotEnough {
+                    BranchSt Enough []
+                      Msg TwoAccept [] Buyer Seller
+                      Msg TwoDate [Int] Seller Buyer
+                      Msg TwoSuccess [Int] Buyer Buyer2
                       Goto 0
-                    BranchSt NotEnough 
-                      Msg "TwoNotBuy1" [] Buyer Seller
-                      Msg "TwoFailed" [] Buyer Buyer2
+                    BranchSt NotEnough [] 
+                      Msg TwoNotBuy1 [] Buyer Seller
+                      Msg TwoFailed [] Buyer Buyer2
                       Goto 0
                 }
               }

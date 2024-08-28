@@ -19,12 +19,11 @@ module Book3.Peer where
 
 import Book3.Protocol
 import Book3.Type
-import Control.Algebra (Has, (:+:))
+import Control.Algebra ((:+:))
 import Control.Effect.Random (Random, uniform)
 import Control.Effect.State
-import Data.IFunctor (At (..), ireturn, returnAt)
+import Data.IFunctor (At (..), returnAt)
 import qualified Data.IFunctor as I
-import Data.Kind
 import TypedSession.Core
 
 budget :: Int
@@ -32,34 +31,26 @@ budget = 16
 
 type Date = Int
 
-data CheckPriceResult :: Book -> Type where
-  Yes :: CheckPriceResult (S5 Enough)
-  No :: CheckPriceResult (S5 NotEnough)
-
 checkPrice
   :: (Has Random sig m)
   => Int
   -> Int
-  -> Peer BookRole Book Buyer m CheckPriceResult S8
+  -> Peer BookRole Book Buyer m EnoughtOrNotEnough S8
 checkPrice _i _h = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure (ireturn Yes)
-    else LiftM $ pure (ireturn No)
-
-data OT :: Book -> Type where
-  OTOne :: OT (S5 One)
-  OTTwo :: OT (S1 Two)
+    then liftConstructor BranchSt_Enough
+    else liftConstructor BranchSt_NotEnough
 
 choiceOT
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer m OT S4
+  -> Peer BookRole Book Buyer m OneOrTwo S4
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then liftConstructor OTOne
-    else liftConstructor OTTwo
+    then liftConstructor BranchSt_One
+    else liftConstructor BranchSt_Two
 
 buyerPeer
   :: (Has Random sig m)
@@ -68,19 +59,19 @@ buyerPeer = I.do
   yield (Title "haskell book")
   await I.>>= \case
     Recv FinishBuyer -> I.do
-       yield FinishBuyer2
-       returnAt Nothing
+      yield FinishBuyer2
+      returnAt Nothing
     Recv NoBook -> I.do
       yield SellerNoBook
       buyerPeer
     Recv (Price i) -> I.do
       choiceOT i I.>>= \case
-        OTOne -> I.do
+        BranchSt_One -> I.do
           yield OneAccept
           Recv (OneDate d) <- await
           yield (OneSuccess d)
           buyerPeer
-        OTTwo -> f1
+        BranchSt_Two -> f1
  where
   f1
     :: (Has Random sig m)
@@ -93,29 +84,25 @@ buyerPeer = I.do
         buyerPeer
       Recv (SupportVal h) -> I.do
         checkPrice 10 h I.>>= \case
-          Yes -> I.do
+          BranchSt_Enough -> I.do
             yield TwoAccept
             Recv (TwoDate d) <- await
             yield (TwoSuccess d)
             buyerPeer
-          No -> I.do
+          BranchSt_NotEnough -> I.do
             yield TwoNotBuy1
             yield TwoFailed
             buyerPeer
 
-data BuySupp :: Book -> Type where
-  BNS :: BuySupp (S6 NotSupport)
-  BS :: BuySupp (S6 Support)
-
 choiceB
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer2 m BuySupp S7
+  -> Peer BookRole Book Buyer2 m SupportOrNotSupport S7
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then liftConstructor BNS
-    else liftConstructor BS
+    then liftConstructor BranchSt_Support
+    else liftConstructor BranchSt_NotSupport
 
 buyer2Peer
   :: (Has Random sig m)
@@ -127,33 +114,28 @@ buyer2Peer = I.do
     Recv (OneSuccess d) -> buyer2Peer
     Recv (PriceToBuyer2 i) -> I.do
       choiceB i I.>>= \case
-        BNS -> I.do
+        BranchSt_NotSupport -> I.do
           yield NotSupport1
           buyer2Peer
-        BS -> I.do
+        BranchSt_Support -> I.do
           yield (SupportVal (i `div` 2))
           await I.>>= \case
             Recv (TwoSuccess d) -> buyer2Peer
             Recv TwoFailed -> buyer2Peer
 
-data FindBookResult :: Book -> Type where
-  NotFound' :: FindBookResult (S2 NotFound)
-  Found' :: FindBookResult (S2 Found)
-  Finish' :: FindBookResult (S2 Finish)
-
 findBook
   :: (Has (Random :+: State Int) sig m)
   => String
-  -> Peer BookRole Book Seller m FindBookResult S3
+  -> Peer BookRole Book Seller m ChoiceAction S3
 findBook _st = I.do
   At i <- liftm $ get @Int
   if i > 30
-    then LiftM $ pure (ireturn Finish')
+    then liftConstructor BranchSt_Finish
     else I.do
       At b <- liftm $ uniform @Bool
       if b
-        then LiftM $ pure (ireturn Found')
-        else LiftM $ pure (ireturn NotFound')
+        then liftConstructor BranchSt_Found
+        else liftConstructor BranchSt_NotFound
 
 sellerPeer
   :: (Has (Random :+: State Int) sig m)
@@ -162,12 +144,12 @@ sellerPeer = I.do
   liftm $ modify @Int (+ 1)
   Recv (Title st) <- await
   findBook st I.>>= \case
-    Finish' -> I.do
+    BranchSt_Finish -> I.do
       yield FinishBuyer
-    NotFound' -> I.do
+    BranchSt_NotFound -> I.do
       yield NoBook
       sellerPeer
-    Found' -> I.do
+    BranchSt_Found -> I.do
       yield (Price 30)
       await I.>>= \case
         Recv OneAccept -> I.do
