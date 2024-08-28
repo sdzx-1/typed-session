@@ -10,6 +10,7 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
+{-# LANGUAGE NumericUnderscores #-}
 
 {- |
 Schematic diagram of the communication structure of three roles through typed-session:
@@ -31,6 +32,7 @@ module TypedSession.Driver where
 
 import Control.Concurrent.Class.MonadSTM
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
+import Control.Monad.Class.MonadTimer (MonadDelay, threadDelay)
 import Data.IFunctor (At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
 import Data.IntMap (IntMap)
@@ -196,7 +198,7 @@ until that Msg is consumed before placing the new Msg in MsgCache.
 This usually happens when the efficiency of Msg generation is greater than the efficiency of consumption.
 -}
 decodeLoop
-  :: (Exception failure, MonadSTM n, MonadThrow n)
+  :: (Exception failure, MonadDelay n, MonadSTM n, MonadThrow n)
   => Tracer role' ps n
   -> Maybe bytes
   -> Decode role' ps failure bytes
@@ -214,4 +216,6 @@ decodeLoop tracer mbt d@Decode{decode} channel tvar = do
           Nothing -> writeTVar tvar (IntMap.insert agencyInt (AnyMsg msg) agencyMsg)
           Just _v -> retry
       decodeLoop tracer mbt' d channel tvar
-    Left failure -> throwIO failure
+    Left failure -> do
+      threadDelay 1_000_000
+      throwIO failure

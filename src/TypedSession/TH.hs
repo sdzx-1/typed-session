@@ -21,6 +21,7 @@ import Data.Either (fromRight)
 import Data.IFunctor (Sing, SingI (..))
 import Data.Kind
 import qualified Data.Set as Set
+import Data.Traversable (for)
 import GHC.Exts (DataToTag (..), Int (..))
 import Language.Haskell.TH hiding (Type)
 import qualified Language.Haskell.TH as TH
@@ -77,7 +78,7 @@ roleDecs name = do
     _ -> error $ "Name: " ++ show name ++ " is not a data constructor"
 
 protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo} = do
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList} = do
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       mkSiName i = mkName $ "S" <> show i
@@ -109,6 +110,8 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
           )
         | ag <- args
         ]
+      typeListT :: [TH.Type] -> TH.Type
+      typeListT = foldl1 AppT
 
   sVar <- newName "s"
   aVar <- newName "a"
@@ -150,6 +153,23 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
         | (name, constrs) <- branchResultTypeInfo
         , let dataName = mkName name
         ]
+  branchFunTypes <- for branchFunList $ \(r, st, t) -> do
+    mVar <- newName "m"
+    pure
+      ( TySynD
+          (mkName (st <> "Fun"))
+          [KindedTV mVar BndrReq (AppT (AppT ArrowT StarT) StarT)]
+          ( typeListT
+              [ ConT ''TSC.Peer
+              , ConT roleName
+              , ConT protName
+              , ConT (mkName (show r))
+              , VarT mVar
+              , ConT (mkName st)
+              , (tAnyToType (mkName "s") t)
+              ]
+          )
+      )
 
   s1 <- newName "s1"
   -- generate instance SingI
@@ -197,10 +217,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
         ]
     _ -> error $ "Name: " ++ show roleName ++ " is not a data constructor"
 
-  let typeListT :: [TH.Type] -> TH.Type
-      typeListT = foldl1 AppT
-
-      isTAny :: T bst -> Bool
+  let isTAny :: T bst -> Bool
       isTAny = \case
         TAny _ -> True
         _ -> False
@@ -276,6 +293,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
       ++ dataSingletonProt
       ++ singSingletonProt
       ++ branchResultDatas
+      ++ branchFunTypes
       ++ instanceSingI
       ++ instanceSingToInt
       ++ instanceMsg

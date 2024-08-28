@@ -102,7 +102,7 @@ socketAsChannel socket =
 myTracer :: (MonadSay m) => String -> Tracer PingPongRole PingPong m
 myTracer st v = say (st <> show v)
 
-choice :: (Monad m) => Int -> Peer PingPongRole PingPong Client m ChoiceNextAction S0
+choice :: (Monad m) => Int -> ChoiceNextActionFun m
 choice i =
   if i `mod` 10 == 1
     then liftConstructor BranchSt_CheckVal

@@ -17,6 +17,7 @@ module Book3.Protocol where
 
 import Book3.Type
 
+import Language.Haskell.TH hiding (Type)
 import TypedSession.Codec
 import TypedSession.Core
 

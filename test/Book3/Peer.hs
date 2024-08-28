@@ -32,7 +32,7 @@ checkPrice
   :: (Has Random sig m)
   => Int
   -> Int
-  -> Peer BookRole Book Buyer m EnoughOrNotEnough S8
+  -> EnoughOrNotEnoughFun m
 checkPrice _i _h = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -42,7 +42,7 @@ checkPrice _i _h = I.do
 choiceOT
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer m OneOrTwo S4
+  -> OneOrTwoFun m
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -91,7 +91,7 @@ buyerPeer = I.do
 choiceB
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer2 m SupportOrNotSupport S7
+  -> SupportOrNotSupportFun m
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b
@@ -119,7 +119,7 @@ buyer2Peer = I.do
 findBook
   :: (Has Random sig m)
   => String
-  -> Peer BookRole Book Seller m FindBookResult S3
+  -> FindBookResultFun m
 findBook _st = I.do
   At b <- liftm $ uniform @Bool
   if b
