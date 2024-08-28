@@ -75,8 +75,8 @@ convertDecoderLBS1 = go
   go (Done tr _ a) = DecodeDone a (Just $ L.fromStrict tr)
   go (Fail _ _ e) = DecodeFail (CodecFailure e)
   go (Partial k) = DecodePartial $ \mbs -> case mbs of
-    Nothing -> go (Partial k)
-    Just _bs -> go (k $ fmap L.toStrict mbs)
+    Nothing -> DecodeFail (CodecFailure "Peer disconnected!!")
+    Just bs -> go (k $ Just $ L.toStrict bs)
 
 decodeMsg
   :: DecodeStep
@@ -91,7 +91,6 @@ socketAsChannel socket =
  where
   send :: L.ByteString -> IO ()
   send chunks = do
-    threadDelay 50000
     Socket.sendMany socket (L.toChunks chunks)
 
   recv :: IO (Maybe L.ByteString)

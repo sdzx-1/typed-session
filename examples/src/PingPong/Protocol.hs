@@ -13,8 +13,6 @@
 
 module PingPong.Protocol where
 
-import qualified Data.IFunctor
-import GHC.Base (Int (I#), dataToTag#)
 import PingPong.Type
 import TypedSession.Core
 
