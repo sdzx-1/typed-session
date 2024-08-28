@@ -247,8 +247,11 @@ await
 await = Await ireturn
 
 {- |
-Lift any m to Peer role' ps r m, which is an application of LiftM. 
+Lift any m to Peer role' ps r m, which is an application of LiftM.
 Note that the state of `ts` has not changed.
 -}
 liftm :: (Functor m) => m a -> Peer role' ps r m (At a ts) ts
 liftm m = LiftM (returnAt <$> m)
+
+liftConstruct :: (Applicative m) => ia st' -> Peer role' k r m ia st
+liftConstruct a = LiftM $ pure $ ireturn a
