@@ -58,8 +58,8 @@ choiceOT
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure $ ireturn OTOne
-    else LiftM $ pure $ ireturn OTTwo
+    then liftConstructor OTOne
+    else liftConstructor OTTwo
 
 buyerPeer
   :: (Has Random sig m)
@@ -114,8 +114,8 @@ choiceB
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure $ ireturn BNS
-    else LiftM $ pure $ ireturn BS
+    then liftConstructor BNS
+    else liftConstructor BS
 
 buyer2Peer
   :: (Has Random sig m)

@@ -19,9 +19,8 @@ import Book3.Protocol
 import Book3.Type
 import Control.Algebra (Has)
 import Control.Effect.Random (Random, uniform)
-import Data.IFunctor (At (..), ireturn, returnAt)
+import Data.IFunctor (At (..), returnAt)
 import qualified Data.IFunctor as I
-import Data.Kind
 import TypedSession.Core
 
 budget :: Int
@@ -29,34 +28,26 @@ budget = 16
 
 type Date = Int
 
-data CheckPriceResult :: Book -> Type where
-  Yes :: CheckPriceResult (S5 Enough)
-  No :: CheckPriceResult (S5 NotEnough)
-
 checkPrice
   :: (Has Random sig m)
   => Int
   -> Int
-  -> Peer BookRole Book Buyer m CheckPriceResult S8
+  -> Peer BookRole Book Buyer m EnoughOrNotEnough S8
 checkPrice _i _h = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure (ireturn Yes)
-    else LiftM $ pure (ireturn No)
-
-data OT :: Book -> Type where
-  OTOne :: OT (S5 One)
-  OTTwo :: OT (S1 Two)
+    then liftConstructor BranchSt_Enough
+    else liftConstructor BranchSt_NotEnough
 
 choiceOT
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer m OT S4
+  -> Peer BookRole Book Buyer m OneOrTwo S4
 choiceOT _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure $ ireturn OTOne
-    else LiftM $ pure $ ireturn OTTwo
+    then liftConstructor BranchSt_One
+    else liftConstructor BranchSt_Two
 
 buyerPeer
   :: (Has Random sig m)
@@ -69,12 +60,12 @@ buyerPeer = I.do
       returnAt Nothing
     Recv (Price i) -> I.do
       choiceOT i I.>>= \case
-        OTOne -> I.do
+        BranchSt_One -> I.do
           yield OneAccept
           Recv (OneDate d) <- await
           yield (OneSuccess d)
           returnAt $ Just d
-        OTTwo -> f1
+        BranchSt_Two -> f1
  where
   f1
     :: (Has Random sig m)
@@ -87,29 +78,25 @@ buyerPeer = I.do
         returnAt Nothing
       Recv (SupportVal h) -> I.do
         checkPrice 10 h I.>>= \case
-          Yes -> I.do
+          BranchSt_Enough -> I.do
             yield TwoAccept
             Recv (TwoDate d) <- await
             yield (TwoSuccess d)
             returnAt (Just d)
-          No -> I.do
+          BranchSt_NotEnough -> I.do
             yield TwoNotBuy1
             yield TwoFailed
             returnAt Nothing
 
-data BuySupp :: Book -> Type where
-  BNS :: BuySupp (S6 NotSupport)
-  BS :: BuySupp (S6 Support)
-
 choiceB
   :: (Has Random sig m)
   => Int
-  -> Peer BookRole Book Buyer2 m BuySupp S7
+  -> Peer BookRole Book Buyer2 m SupportOrNotSupport S7
 choiceB _i = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure $ ireturn BNS
-    else LiftM $ pure $ ireturn BS
+    then liftConstructor BranchSt_Support
+    else liftConstructor BranchSt_NotSupport
 
 buyer2Peer
   :: (Has Random sig m)
@@ -120,18 +107,14 @@ buyer2Peer = I.do
     Recv (OneSuccess d) -> returnAt (Just d)
     Recv (PriceToBuyer2 i) -> I.do
       choiceB i I.>>= \case
-        BNS -> I.do
+        BranchSt_NotSupport -> I.do
           yield NotSupport1
           returnAt Nothing
-        BS -> I.do
+        BranchSt_Support -> I.do
           yield (SupportVal (i `div` 2))
           await I.>>= \case
             Recv (TwoSuccess d) -> returnAt $ Just d
             Recv TwoFailed -> returnAt Nothing
-
-data FindBookResult :: Book -> Type where
-  NotFound' :: FindBookResult (S2 NotFound)
-  Found' :: FindBookResult (S2 Found)
 
 findBook
   :: (Has Random sig m)
@@ -140,8 +123,8 @@ findBook
 findBook _st = I.do
   At b <- liftm $ uniform @Bool
   if b
-    then LiftM $ pure (ireturn Found')
-    else LiftM $ pure (ireturn NotFound')
+    then liftConstructor BranchSt_Found
+    else liftConstructor BranchSt_NotFound
 
 sellerPeer
   :: (Has Random sig m)
@@ -149,8 +132,8 @@ sellerPeer
 sellerPeer = I.do
   Recv (Title st) <- await
   findBook st I.>>= \case
-    NotFound' -> yield NoBook
-    Found' -> I.do
+    BranchSt_NotFound -> yield NoBook
+    BranchSt_Found -> I.do
       yield (Price 30)
       await I.>>= \case
         Recv OneAccept -> yield (OneDate 100)
