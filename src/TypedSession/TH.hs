@@ -77,7 +77,7 @@ roleDecs name = do
     _ -> error $ "Name: " ++ show name ++ " is not a data constructor"
 
 protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal)} = do
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo} = do
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       mkSiName i = mkName $ "S" <> show i
@@ -94,6 +94,21 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
               else NormalC (mkSiName i) []
       -- generate protocol data type
       dataProt = [DataD [] protName [] Nothing [genConstr i | i <- [fromVal .. toVal]] []]
+
+  let tAnyToType :: Name -> T bst -> TH.Type
+      tAnyToType s = \case
+        TNum i -> PromotedT (mkSiName i)
+        BstList i bst -> AppT (PromotedT (mkSiName i)) (PromotedT (mkName (show bst)))
+        TAny i -> AppT (PromotedT (mkSiName i)) (VarT s)
+        TEnd -> PromotedT $ mkName "End"
+      mkArgs args =
+        [ ( Bang NoSourceUnpackedness NoSourceStrictness
+          , case ag of
+              [] -> error "np"
+              (x : xs) -> foldl' AppT (ConT (mkName x)) (map (ConT . mkName) xs)
+          )
+        | ag <- args
+        ]
 
   sVar <- newName "s"
   aVar <- newName "a"
@@ -116,8 +131,25 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
                 GadtC [mkSSiName i] [] (AppT (ConT protSName) (PromotedT $ mkSiName i))
       -- generate protocol singleton data type
       dataSingletonProt = [DataD [] protSName [KindedTV aVar BndrReq (ConT protName)] Nothing [genSConstr i | i <- [fromVal .. toVal]] []]
+
   -- generate type family Sing to Singleton protocol
   let singSingletonProt = [TySynInstD (TySynEqn Nothing (ConT ''Sing) (ConT protSName))]
+
+  aVar1 <- newName "a"
+  let branchResultDatas =
+        [ DataD
+            []
+            dataName
+            [KindedTV aVar1 BndrReq (ConT protName)]
+            Nothing
+            [ GadtC [constrName] (mkArgs args) (AppT (ConT dataName) (tAnyToType (mkName "s") t))
+            | (bst, args, t) <- constrs
+            , let constrName = mkName ("BranchSt_" <> show bst)
+            ]
+            []
+        | (name, constrs) <- branchResultTypeInfo
+        , let dataName = mkName name
+        ]
 
   s1 <- newName "s1"
   -- generate instance SingI
@@ -176,32 +208,20 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
       mkDataInstanceMsg :: Name -> Protocol (MsgT1 r bst) r bst -> Q [Con]
       mkDataInstanceMsg s = \case
         Msg ((a, b, c), (from, to), _) constr args _ _ :> prots -> do
-          let tAnyToType :: T bst -> TH.Type
-              tAnyToType = \case
-                TNum i -> PromotedT (mkSiName i)
-                BstList i bst -> AppT (PromotedT (mkSiName i)) (PromotedT (mkName (show bst)))
-                TAny i -> AppT (PromotedT (mkSiName i)) (VarT s)
-                TEnd -> PromotedT $ mkName "End"
           let mkTName =
                 typeListT
                   [ ConT ''TSC.Msg
                   , ConT roleName
                   , ConT protName
-                  , tAnyToType a
-                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show from)), tAnyToType b]
-                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show to)), tAnyToType c]
+                  , tAnyToType s a
+                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show from)), tAnyToType s b]
+                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show to)), tAnyToType s c]
                   ]
           let val =
                 let gadtc =
                       GadtC
                         [mkName constr]
-                        [ ( Bang NoSourceUnpackedness NoSourceStrictness
-                          , case ag of
-                              [] -> error "np"
-                              (x : xs) -> foldl' AppT (ConT (mkName x)) (map (ConT . mkName) xs)
-                          )
-                        | ag <- args
-                        ]
+                        (mkArgs args)
                         mkTName
                  in if any isTAny [a, b, c]
                       then ForallC [KindedTV s SpecifiedSpec (ConT bstName)] [] gadtc
@@ -255,6 +275,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
     dataProt
       ++ dataSingletonProt
       ++ singSingletonProt
+      ++ branchResultDatas
       ++ instanceSingI
       ++ instanceSingToInt
       ++ instanceMsg
