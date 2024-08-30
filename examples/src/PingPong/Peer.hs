@@ -118,11 +118,11 @@ clientPeer i = I.do
   case res of
     BranchSt_CheckVal -> I.do
       yield (Check i)
-      Recv (CheckResult _b) <- await
+      (CheckResult _b) <- await
       clientPeer (i + 1)
     BranchSt_Continue -> I.do
       yield Ping
-      Recv Pong <- await
+      Pong <- await
       yield AddOne
       clientPeer (i + 1)
     BranchSt_Finish -> I.do
@@ -132,7 +132,7 @@ clientPeer i = I.do
 serverPeer
   :: (Monad m) => Peer PingPongRole PingPong Server m (At () (Done Server)) (S1 s)
 serverPeer = I.do
-  Recv msg <- await
+  msg <- await
   case msg of
     Ping -> I.do
       yield Pong
@@ -142,7 +142,7 @@ serverPeer = I.do
 counterPeer
   :: (MonadIO m) => Int -> Peer PingPongRole PingPong Counter m (At () (Done Server)) (S2 s)
 counterPeer i = I.do
-  Recv msg <- await
+  msg <- await
   case msg of
     Check _i -> I.do
       yield (CheckResult True)
