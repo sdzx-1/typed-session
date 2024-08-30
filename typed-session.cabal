@@ -95,14 +95,10 @@ test-suite typed-session-test
     default-language: Haskell2010
 
     -- Modules included in this executable, other than Main.
-    other-modules: Book
-                 , Book1
-                 , Book2
-                 , Book3.Type
+    other-modules: Book3.Type
                  , Book3.Protocol
                  , Book3.Peer
                  , Book3.Main
-                 , PingPong
 
     -- LANGUAGE extensions used by modules in this package.
     -- other-extensions:

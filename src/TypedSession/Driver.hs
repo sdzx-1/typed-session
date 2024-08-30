@@ -3,6 +3,7 @@
 {-# LANGUAGE FlexibleContexts #-}
 {-# LANGUAGE GADTs #-}
 {-# LANGUAGE NamedFieldPuns #-}
+{-# LANGUAGE NumericUnderscores #-}
 {-# LANGUAGE PolyKinds #-}
 {-# LANGUAGE RankNTypes #-}
 {-# LANGUAGE ScopedTypeVariables #-}
@@ -10,7 +11,6 @@
 {-# LANGUAGE TypeOperators #-}
 {-# LANGUAGE UndecidableInstances #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
-{-# LANGUAGE NumericUnderscores #-}
 
 {- |
 Schematic diagram of the communication structure of three roles through typed-session:
@@ -56,7 +56,7 @@ data Driver role' ps m
          , SingToInt role'
          )
       => Sing recv
-      -> Msg role' ps st '(send, st') '(recv, st'')
+      -> Msg role' ps st send st' recv st''
       -> m ()
   , recvMsg
       :: forall (st' :: ps)
@@ -85,12 +85,12 @@ runPeerWithDriver Driver{sendMsg, recvMsg} =
     -> m a
   go (IReturn (At a)) = pure a
   go (LiftM k) = k >>= go
-  go (Yield (msg :: Msg role' ps (st' :: ps) '(r, sps) '(recv :: role', rps)) k) = do
+  go (Yield (msg :: Msg role' ps st' r sps recv rps) k) = do
     sendMsg (sing @recv) msg
     go k
-  go (Await (k :: (Recv role' ps r st' I.~> Peer role' ps r m ia))) = do
+  go (Await (k :: (Msg role' ps st' send sps r I.~> Peer role' ps r m ia))) = do
     AnyMsg msg <- recvMsg (sing @st')
-    go (k $ unsafeCoerce (Recv msg))
+    go (k $ unsafeCoerce msg)
 
 {- |
 A wrapper around AnyMsg that represents sending and receiving Msg.
@@ -158,7 +158,7 @@ driverSimple tracer Encode{encode} sendMap tvar liftFun =
        , SingToInt role'
        )
     => Sing recv
-    -> Msg role' ps from '(send, st) '(recv, st1)
+    -> Msg role' ps from send st recv st1
     -> m ()
   sendMsg role msg = liftFun $ do
     case IntMap.lookup (singToInt role) sendMap of

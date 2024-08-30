@@ -21,7 +21,7 @@ Function to encode Msg into bytes.
 newtype Encode role' ps bytes = Encode
   { encode
       :: forall (send :: role') (recv :: role') (st :: ps) (st' :: ps) (st'' :: ps)
-       . Msg role' ps st '(send, st') '(recv, st'')
+       . Msg role' ps st send st' recv st''
       -> bytes
   }
 

@@ -55,38 +55,33 @@ buyerPeer
 buyerPeer = I.do
   yield (Title "haskell book")
   await I.>>= \case
-    Recv NoBook -> I.do
+    NoBook -> I.do
       yield SellerNoBook
       returnAt Nothing
-    Recv (Price i) -> I.do
+    Price i -> I.do
       choiceOT i I.>>= \case
         BranchSt_One -> I.do
           yield OneAccept
-          Recv (OneDate d) <- await
+          OneDate d <- await
           yield (OneSuccess d)
           returnAt $ Just d
-        BranchSt_Two -> f1
- where
-  f1
-    :: (Has Random sig m)
-    => Peer BookRole Book 'Buyer m (At (Maybe Date) (Done Buyer)) ('S1 'Two)
-  f1 = I.do
-    yield (PriceToBuyer2 300)
-    await I.>>= \case
-      Recv NotSupport1 -> I.do
-        yield TwoNotBuy
-        returnAt Nothing
-      Recv (SupportVal h) -> I.do
-        checkPrice 10 h I.>>= \case
-          BranchSt_Enough -> I.do
-            yield TwoAccept
-            Recv (TwoDate d) <- await
-            yield (TwoSuccess d)
-            returnAt (Just d)
-          BranchSt_NotEnough -> I.do
-            yield TwoNotBuy1
-            yield TwoFailed
-            returnAt Nothing
+        BranchSt_Two -> I.do
+          yield (PriceToBuyer2 (i `div` 2))
+          await I.>>= \case
+            NotSupport1 -> I.do
+              yield TwoNotBuy
+              returnAt Nothing
+            SupportVal h -> I.do
+              checkPrice 10 h I.>>= \case
+                BranchSt_Enough -> I.do
+                  yield TwoAccept
+                  TwoDate d <- await
+                  yield (TwoSuccess d)
+                  returnAt (Just d)
+                BranchSt_NotEnough -> I.do
+                  yield TwoNotBuy1
+                  yield TwoFailed
+                  returnAt Nothing
 
 choiceB
   :: (Has Random sig m)
@@ -103,9 +98,9 @@ buyer2Peer
   => Peer BookRole Book Buyer2 m (At (Maybe Date) (Done Buyer2)) (S1 s)
 buyer2Peer = I.do
   await I.>>= \case
-    Recv SellerNoBook -> returnAt Nothing
-    Recv (OneSuccess d) -> returnAt (Just d)
-    Recv (PriceToBuyer2 i) -> I.do
+    SellerNoBook -> returnAt Nothing
+    (OneSuccess d) -> returnAt (Just d)
+    (PriceToBuyer2 i) -> I.do
       choiceB i I.>>= \case
         BranchSt_NotSupport -> I.do
           yield NotSupport1
@@ -113,8 +108,8 @@ buyer2Peer = I.do
         BranchSt_Support -> I.do
           yield (SupportVal (i `div` 2))
           await I.>>= \case
-            Recv (TwoSuccess d) -> returnAt $ Just d
-            Recv TwoFailed -> returnAt Nothing
+            TwoSuccess d -> returnAt $ Just d
+            TwoFailed -> returnAt Nothing
 
 findBook
   :: (Has Random sig m)
@@ -130,13 +125,13 @@ sellerPeer
   :: (Has Random sig m)
   => Peer BookRole Book Seller m (At () (Done Seller)) S0
 sellerPeer = I.do
-  Recv (Title st) <- await
+  (Title st) <- await
   findBook st I.>>= \case
     BranchSt_NotFound -> yield NoBook
     BranchSt_Found -> I.do
       yield (Price 30)
       await I.>>= \case
-        Recv OneAccept -> yield (OneDate 100)
-        Recv TwoNotBuy -> returnAt ()
-        Recv TwoAccept -> yield (TwoDate 100)
-        Recv TwoNotBuy1 -> returnAt ()
+        OneAccept -> yield (OneDate 100)
+        TwoNotBuy -> returnAt ()
+        TwoAccept -> yield (TwoDate 100)
+        TwoNotBuy1 -> returnAt ()

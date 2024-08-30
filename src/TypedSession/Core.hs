@@ -72,15 +72,25 @@ type Done (sr :: role') :: ps
 Describe the state of each role when it terminates.
 
 @
-data Msg role' ps (from :: ps) (sendAndSt :: (role', ps)) (recvAndSt :: (role', ps))
+data
+  Msg
+    role'
+    ps
+    (fromSt :: ps)
+    (sender :: role')
+    (senderNewSt :: ps)
+    (receiver :: role')
+    (receiverNewSt :: ps)
 @
 * role': the type of the role.
 * ps: the type of the state machine.
-* ​​from: when sending a message, the sender is in this state,
+* ​​fromSt: when sending a message, the sender is in this state,
 where the receiver may be in this state, or a more generalized state related to this state.
 For example, the sender is in state (S1 [True]), and the receiver is in state (S1 s).
-* sendAndSt: the role that sends the message and the state of the role after sending the message.
-* recvAndSt: the role that receives the message and the state of the role after receiving the message.
+* sender: the role that sends the message
+* senderNewSt: the state of the role after sending the message
+* receiver: the role that receives the message
+* receiverNewSt: the state of the role after receiving the message
 
 There are two principles to follow when designing the state of Msg:
 
@@ -101,20 +111,15 @@ s2   s4   s5
 -}
 class (SingToInt role', SingToInt ps) => Protocol role' ps where
   type Done (sr :: role') :: ps
-  data Msg role' ps (from :: ps) (sendAndSt :: (role', ps)) (recvAndSt :: (role', ps))
-
-{- |
-Package Msg and extract the required type.
-
-@
-Msg  role' ps from '(send, sps) '(recv,     rps)
-Recv role' ps                     recv from rps
-@
--}
-data Recv role' ps recv from to where
-  Recv
-    :: Msg role' ps from '(send, sps) '(recv, rps)
-    -> Recv role' ps recv from rps
+  data
+    Msg
+      role'
+      ps
+      (fromSt :: ps)
+      (sender :: role')
+      (senderNewSt :: ps)
+      (receiver :: role')
+      (receiverNewSt :: ps)
 
 {- |
 Messages received from the outside are placed in MsgCache. When interpreting
@@ -132,13 +137,13 @@ data AnyMsg role' ps where
        , SingToInt role'
        , SingToInt ps
        )
-    => Msg role' ps st '(send, st') '(recv, st'')
+    => Msg role' ps st send st' recv st''
     -> AnyMsg role' ps
 
 msgFromStSing
   :: forall role' ps st send recv st' st''
    . (SingI recv, SingI st)
-  => Msg role' ps st '(send, st') '(recv, st'')
+  => Msg role' ps st send st' recv st''
   -> Sing st
 msgFromStSing _ = sing @st
 
@@ -178,7 +183,7 @@ Await
      , SingI from
      , SingToInt ps
      )
-  => (Recv role' ps recv from ~> Peer role' ps recv m ia)
+  => (Msg role' ps from send sps recv ~> Peer role' ps recv m ia)
   -> Peer role' ps recv m ia from
 @
 
@@ -194,7 +199,7 @@ data Peer role' ps (r :: role') (m :: Type -> Type) (ia :: ps -> Type) (st :: ps
        , SingI from
        , SingToInt ps
        )
-    => Msg role' ps from '(send, sps) '(recv, rps)
+    => Msg role' ps from send sps recv rps
     -> Peer role' ps send m ia sps
     -> Peer role' ps send m ia from
   Await
@@ -202,7 +207,7 @@ data Peer role' ps (r :: role') (m :: Type -> Type) (ia :: ps -> Type) (st :: ps
        , SingI from
        , SingToInt ps
        )
-    => (Recv role' ps recv from ~> Peer role' ps recv m ia)
+    => (Msg role' ps from send sps recv ~> Peer role' ps recv m ia)
     -> Peer role' ps recv m ia from
 
 instance (Functor m) => IMonadFail (Peer role' ps r m) where
@@ -232,7 +237,7 @@ yield
      , SingI from
      , SingToInt ps
      )
-  => Msg role' ps from '(send, sps) '(recv, rps)
+  => Msg role' ps from send sps recv rps
   -> Peer role' ps send m (At () sps) from
 yield msg = Yield msg (returnAt ())
 
@@ -245,7 +250,7 @@ await
      , SingI from
      , SingToInt ps
      )
-  => Peer role' ps recv m (Recv role' ps recv from) from
+  => Peer role' ps recv m (Msg role' ps from send sps recv) from
 await = Await ireturn
 
 {- |

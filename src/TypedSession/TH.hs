@@ -231,8 +231,10 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
                   , ConT roleName
                   , ConT protName
                   , tAnyToType s a
-                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show from)), tAnyToType s b]
-                  , typeListT [PromotedTupleT 2, PromotedT (mkName (show to)), tAnyToType s c]
+                  , PromotedT (mkName (show from))
+                  , tAnyToType s b
+                  , PromotedT (mkName (show to))
+                  , tAnyToType s c
                   ]
           let val =
                 let gadtc =
@@ -256,35 +258,40 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
   instMsgDesc <- mkDataInstanceMsg ssVar (msgT1)
   fromVar <- newName "from"
   sendVar <- newName "send"
+  sendNewStVar <- newName "sendNewSt"
   recvVar <- newName "recv"
+  receiverNewStVar <- newName "receiverNewSt"
   let instanceMsg =
         [ InstanceD
             Nothing
             []
             (AppT (AppT (ConT ''TSC.Protocol) (ConT roleName)) (ConT protName))
             ( instDoneDesc
-                ++ let ct1 = (AppT (AppT (TupleT 2) (ConT roleName)) (ConT protName))
-                    in [ DataInstD
-                          []
-                          ( Just
-                              [ KindedTV fromVar () (ConT protName)
-                              , KindedTV sendVar () ct1
-                              , KindedTV recvVar () ct1
-                              ]
-                          )
-                          ( typeListT
-                              [ ConT ''TSC.Msg
-                              , ConT roleName
-                              , ConT protName
-                              , (SigT (VarT fromVar) (ConT protName))
-                              , (SigT (VarT sendVar) ct1)
-                              , (SigT (VarT recvVar) ct1)
-                              ]
-                          )
-                          Nothing
-                          instMsgDesc
-                          []
-                       ]
+                ++ [ DataInstD
+                      []
+                      ( Just
+                          [ KindedTV fromVar () (ConT protName)
+                          , KindedTV sendVar () (ConT roleName)
+                          , KindedTV sendNewStVar () (ConT protName)
+                          , KindedTV recvVar () (ConT roleName)
+                          , KindedTV receiverNewStVar () (ConT protName)
+                          ]
+                      )
+                      ( typeListT
+                          [ ConT ''TSC.Msg
+                          , ConT roleName
+                          , ConT protName
+                          , (SigT (VarT fromVar) (ConT protName))
+                          , (SigT (VarT sendVar) (ConT roleName))
+                          , (SigT (VarT sendNewStVar) (ConT protName))
+                          , (SigT (VarT recvVar) (ConT roleName))
+                          , (SigT (VarT receiverNewStVar) (ConT protName))
+                          ]
+                      )
+                      Nothing
+                      instMsgDesc
+                      []
+                   ]
             )
         ]
 
