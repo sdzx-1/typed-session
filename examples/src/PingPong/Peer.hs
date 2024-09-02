@@ -112,7 +112,7 @@ choice i =
         else liftConstructor BranchSt_Finish
 
 clientPeer
-  :: (Monad m) => Int -> Peer PingPongRole PingPong Client m (At () (Done Client)) S0
+  :: (Monad m) => Int -> Peer PingPongRole PingPong Client m (At () (Done Client)) ClientStartSt
 clientPeer i = I.do
   res <- choice i
   case res of
@@ -130,7 +130,7 @@ clientPeer i = I.do
       yield CStop
 
 serverPeer
-  :: (Monad m) => Peer PingPongRole PingPong Server m (At () (Done Server)) (S1 s)
+  :: (Monad m) => Peer PingPongRole PingPong Server m (At () (Done Server)) (ServerStartSt s)
 serverPeer = I.do
   msg <- await
   case msg of
@@ -140,7 +140,7 @@ serverPeer = I.do
     Stop -> returnAt ()
 
 counterPeer
-  :: (MonadIO m) => Int -> Peer PingPongRole PingPong Counter m (At () (Done Server)) (S2 s)
+  :: (MonadIO m) => Int -> Peer PingPongRole PingPong Counter m (At () (Done Server)) (CounterStartSt s)
 counterPeer i = I.do
   msg <- await
   case msg of

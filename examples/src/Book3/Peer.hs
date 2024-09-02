@@ -54,7 +54,7 @@ choiceOT _i = I.do
 
 buyerPeer
   :: (Has Random sig m)
-  => Peer BookRole Book Buyer m (At (Maybe Date) (Done Buyer)) S0
+  => Peer BookRole Book Buyer m (At (Maybe Date) (Done Buyer)) BuyerStartSt
 buyerPeer = I.do
   yield (Title "haskell book")
   await I.>>= \case
@@ -101,7 +101,7 @@ choiceB _i = I.do
 
 buyer2Peer
   :: (Has Random sig m)
-  => Peer BookRole Book Buyer2 m (At (Maybe Date) (Done Buyer2)) (S1 s)
+  => Peer BookRole Book Buyer2 m (At (Maybe Date) (Done Buyer2)) (Buyer2StartSt s)
 buyer2Peer = I.do
   await I.>>= \case
     FinishBuyer2 -> returnAt Nothing
@@ -134,7 +134,7 @@ findBook _st = I.do
 
 sellerPeer
   :: (Has (Random :+: State Int) sig m)
-  => Peer BookRole Book Seller m (At () (Done Seller)) S0
+  => Peer BookRole Book Seller m (At () (Done Seller)) SellerStartSt
 sellerPeer = I.do
   liftm $ modify @Int (+ 1)
   (Title st) <- await
