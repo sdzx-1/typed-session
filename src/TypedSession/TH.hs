@@ -77,8 +77,8 @@ roleDecs name = do
       pure $ roleSingleton ++ singToSRole ++ instanceSingI ++ instanceSingToInt
     _ -> error $ "Name: " ++ show name ++ " is not a data constructor"
 
-protDecsAndMsgDecs :: forall r bst. (Show r, Show bst) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList} = do
+protDecsAndMsgDecs :: forall r bst. (Show r, Show bst, Enum r, Bounded r) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList} = do
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       mkSiName i = mkName $ "S" <> show i
@@ -112,6 +112,11 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
         ]
       typeListT :: [TH.Type] -> TH.Type
       typeListT = foldl1 AppT
+
+      isTAny :: T bst -> Bool
+      isTAny = \case
+        TAny _ -> True
+        _ -> False
 
   sVar <- newName "s"
   aVar <- newName "a"
@@ -170,6 +175,20 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
               ]
           )
       )
+  let firstTList = case msgT of
+        Msg (ts, _, _) _ _ _ _ :> _ -> ts
+        Label (ts, _) _ :> _ -> ts
+        Branch ts _ _ _ -> ts
+        Goto (ts, _) _ -> ts
+        Terminal ts -> ts
+
+  roleStartSts <- do
+    for (zip [minBound @r .. maxBound] firstTList) $ \(r, t) -> do
+      if isTAny t
+        then do
+          sVar1 <- newName "s"
+          pure (TySynD (mkName (show r <> "StartSt")) [KindedTV sVar1 BndrReq (ConT bstName)] (tAnyToType sVar1 t))
+        else pure (TySynD (mkName (show r <> "StartSt")) [] (tAnyToType (mkName "s") t))
 
   s1 <- newName "s1"
   -- generate instance SingI
@@ -217,12 +236,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
         ]
     _ -> error $ "Name: " ++ show roleName ++ " is not a data constructor"
 
-  let isTAny :: T bst -> Bool
-      isTAny = \case
-        TAny _ -> True
-        _ -> False
-
-      mkDataInstanceMsg :: Name -> Protocol (MsgT1 r bst) r bst -> Q [Con]
+  let mkDataInstanceMsg :: Name -> Protocol (MsgT1 r bst) r bst -> Q [Con]
       mkDataInstanceMsg s = \case
         Msg ((a, b, c), (from, to), _) constr args _ _ :> prots -> do
           let mkTName =
@@ -301,6 +315,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT1, dnySet, stBound = (f
       ++ singSingletonProt
       ++ branchResultDatas
       ++ branchFunTypes
+      ++ roleStartSts
       ++ instanceSingI
       ++ instanceSingToInt
       ++ instanceMsg

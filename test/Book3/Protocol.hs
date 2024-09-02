@@ -12,6 +12,7 @@
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
 {-# OPTIONS_GHC -ddump-splices #-}
+{-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Book3.Protocol where
 
@@ -19,6 +20,8 @@ import Book3.Type
 
 import TypedSession.Codec
 import TypedSession.Core
+import Language.Haskell.TH
+
 
 [bookProtocol|
   Label 0
@@ -26,8 +29,8 @@ import TypedSession.Core
     Branch Seller FindBookResult {
         BranchSt NotFound []
           Msg NoBook [] Seller Buyer
-               Msg SellerNoBook [] Buyer Buyer2
-               Terminal
+          Msg SellerNoBook [] Buyer Buyer2
+          Terminal
         BranchSt Found []
           Msg Price [Int] Seller Buyer
           Branch Buyer OneOrTwo {
@@ -109,3 +112,18 @@ instance Show (AnyMsg BookRole Book) where
     TwoSuccess d -> "TwoSuccess " <> show d
     TwoNotBuy1 -> "TwoNotBuy1"
     TwoFailed -> "TwoFailed"
+
+type Start s = Maybe s
+type Start1  = Int
+
+$( do 
+ x <- reify ''Start 
+ y <- reify ''Start1
+ runIO $ do 
+  putStrLn "--------------------------------------------"
+  putStrLn $ show x
+  putStrLn $ show y
+  putStrLn "--------------------------------------------"
+ pure []
+
+  )
