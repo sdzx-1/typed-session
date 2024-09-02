@@ -78,7 +78,7 @@ roleDecs name = do
     _ -> error $ "Name: " ++ show name ++ " is not a data constructor"
 
 protDecsAndMsgDecs :: forall r bst. (Show r, Show bst, Enum r, Bounded r) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList} = do
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList, allMsgBATypes} = do
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       mkSiName i = mkName $ "S" <> show i
@@ -182,13 +182,25 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
         Goto (ts, _) _ -> ts
         Terminal ts -> ts
 
-  roleStartSts <- do
-    for (zip [minBound @r .. maxBound] firstTList) $ \(r, t) -> do
-      if isTAny t
-        then do
-          sVar1 <- newName "s"
-          pure (TySynD (mkName (show r <> "StartSt")) [KindedTV sVar1 BndrReq (ConT bstName)] (tAnyToType sVar1 t))
-        else pure (TySynD (mkName (show r <> "StartSt")) [] (tAnyToType (mkName "s") t))
+      mkTySynDFun name t =
+        if isTAny t
+          then do
+            sVar1 <- newName @Q "s"
+            pure (TySynD name [KindedTV sVar1 BndrReq (ConT bstName)] (tAnyToType sVar1 t))
+          else pure (TySynD name [] (tAnyToType (mkName "s") t))
+
+      mkAllRoleTySynDFun nameFun ts =
+        for (zip [minBound @r .. maxBound] ts) $
+          \(r, t) -> mkTySynDFun (nameFun r) t
+
+  roleStartSts <- mkAllRoleTySynDFun (\r -> (mkName (show r <> "StartSt"))) firstTList
+
+  allMsgBADecs <-
+    concat <$> do
+      for allMsgBATypes $ \(cname, beforeSt, afterSt) -> do
+        bfs <- mkAllRoleTySynDFun (\r -> mkName (show r <> "Before" <> cname <> "St")) beforeSt
+        afs <- mkAllRoleTySynDFun (\r -> mkName (show r <> "After" <> cname <> "St")) afterSt
+        pure (bfs <> afs)
 
   s1 <- newName "s1"
   -- generate instance SingI
@@ -316,6 +328,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
       ++ branchResultDatas
       ++ branchFunTypes
       ++ roleStartSts
+      ++ allMsgBADecs
       ++ instanceSingI
       ++ instanceSingToInt
       ++ instanceMsg
