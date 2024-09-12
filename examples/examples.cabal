@@ -58,6 +58,7 @@ library
                , bytestring
                , network
                , template-haskell
+               , split
   default-language: Haskell2010
   hs-source-dirs: src
   exposed-modules: Book3.Type
@@ -67,6 +68,18 @@ library
                  , PingPong.Type
                  , PingPong.Protocol
                  , PingPong.Peer
+                 , Bank.Type
+                 , Bank.Protocol
+                 , Bank.Peer
+
+
+executable bank
+  build-depends: base
+               , examples
+  main-is: Bank.hs
+  default-language: Haskell2010
+  hs-source-dirs: Bank
+
 
 executable buyer
   build-depends: base
