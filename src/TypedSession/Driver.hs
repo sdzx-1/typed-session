@@ -184,6 +184,59 @@ driverSimple tracer Encode{encode} sendMap tvar liftFun =
       tracer (TraceRecvMsg (anyMsg))
       pure anyMsg
 
+localDriverSimple
+  :: forall role' ps m n
+   . ( Monad m
+     , Monad n
+     , MonadSTM n
+     )
+  => Tracer role' ps n
+  -> IntMap (TVar n (MsgCache role' ps))
+  -> TVar n (MsgCache role' ps)
+  -> (forall a. n a -> m a)
+  -> Driver role' ps m
+localDriverSimple tracer allTVar tvar liftFun =
+  Driver{sendMsg, recvMsg}
+ where
+  sendMsg
+    :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
+     . ( SingI recv
+       , SingI from
+       , SingToInt ps
+       , SingToInt role'
+       )
+    => Sing recv
+    -> Msg role' ps from send st recv st1
+    -> m ()
+  sendMsg role msg = liftFun $ do
+    case IntMap.lookup (singToInt role) allTVar of
+      Nothing -> error "np"
+      Just ttvar -> atomically $ do
+        agencyMsg <- readTVar ttvar
+        let singInt = singToInt (sing @from)
+        case IntMap.lookup singInt agencyMsg of
+          Nothing -> writeTVar ttvar (IntMap.insert singInt (AnyMsg msg) agencyMsg)
+          Just _v -> retry
+    tracer (TraceSendMsg (AnyMsg msg))
+
+  recvMsg
+    :: forall (st' :: ps)
+     . (SingToInt ps)
+    => Sing st'
+    -> m (AnyMsg role' ps)
+  recvMsg sst' = do
+    let singInt = singToInt sst'
+    liftFun $ do
+      anyMsg <- atomically $ do
+        agencyMsg <- readTVar tvar
+        case IntMap.lookup singInt agencyMsg of
+          Nothing -> retry
+          Just v -> do
+            writeTVar tvar (IntMap.delete singInt agencyMsg)
+            pure v
+      tracer (TraceRecvMsg (anyMsg))
+      pure anyMsg
+
 {- |
 decode loop, usually in a separate thread.
 
