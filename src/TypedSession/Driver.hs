@@ -31,15 +31,15 @@ When sending a message, the send function of the receiver is searched from SendM
 module TypedSession.Driver where
 
 import Control.Concurrent.Class.MonadSTM
-import Control.Monad.Class.MonadFork (MonadFork, forkIO)
+import Control.Monad.Class.MonadFork (MonadFork (killThread), forkIO)
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
 import Control.Monad.Class.MonadTimer (MonadDelay, threadDelay)
 import Data.Data (Typeable)
-import Data.Foldable (for_)
 import Data.IFunctor (At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
 import Data.IntMap (IntMap)
 import qualified Data.IntMap as IntMap
+import Data.Traversable (for)
 import GHC.Exception (Exception)
 import TypedSession.Codec
 import TypedSession.Core
@@ -66,6 +66,7 @@ data Driver role' ps m
        . (SingToInt ps)
       => Sing st'
       -> m (AnyMsg role' ps)
+  , terminalDecodeThreads :: [m ()]
   }
 
 {- |
@@ -79,8 +80,10 @@ runPeerWithDriver
   => Driver role' ps m
   -> Peer role' ps r m (At a (Done r)) st
   -> m a
-runPeerWithDriver Driver{sendMsg, recvMsg} =
-  go
+runPeerWithDriver Driver{sendMsg, recvMsg, terminalDecodeThreads} peer = do
+  a <- go peer
+  sequence_ terminalDecodeThreads
+  pure a
  where
   go
     :: forall st'
@@ -171,8 +174,9 @@ driverSimple
   connChannels
   liftFun = do
     msgCache <- newTVarIO IntMap.empty
-    for_ connChannels $ \(_, channel) -> forkIO $ decodeLoop Nothing decodeV channel msgCache
-    pure $ Driver{sendMsg, recvMsg = recvMsg' msgCache}
+    ths <- for connChannels $ \(_, channel) -> forkIO $ decodeLoop Nothing decodeV channel msgCache
+    let terminalDecodeThreads = map (\tid -> liftFun $ killThread tid) ths
+    pure $ Driver{sendMsg, recvMsg = recvMsg' msgCache, terminalDecodeThreads}
    where
     sendMap = IntMap.fromList $ fmap (\(SomeRole r, c) -> (singToInt r, send c)) connChannels
     sendMsg
@@ -266,7 +270,7 @@ localDriverSimple
   -> (forall a. n a -> m a)
   -> Driver role' ps m
 localDriverSimple tracer allMsgCache (SomeRole r) liftFun =
-  Driver{sendMsg, recvMsg = recvMsg' (allMsgCache IntMap.! (singToInt r))}
+  Driver{sendMsg, recvMsg = recvMsg' (allMsgCache IntMap.! (singToInt r)), terminalDecodeThreads = []}
  where
   sendMsg
     :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
