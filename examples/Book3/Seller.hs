@@ -44,16 +44,6 @@ runTCPClient host port = withSocketsDo $ do
     return sock
 
   client sock = do
-    sellerTvar <- newTVarIO IntMap.empty
-    let buyerChannel = socketAsChannel sock
-        sendMap = IntMap.fromList [(singToInt SBuyer, C.send buyerChannel)]
-        sellerDriver = driverSimple (myTracer "seller :") encodeMsg sendMap sellerTvar liftIO
-
-    -- fork seller decode thread, buyer -> seller
-    thid <- forkIO $ decodeLoop (myTracer "seller :") Nothing (Decode decodeMsg) buyerChannel sellerTvar
-
+    sellerDriver <- driverSimple (myTracer "seller :") encodeMsg (Decode decodeMsg) [(SomeRole SBuyer, socketAsChannel sock)] liftIO
     g <- newStdGen
-
     void $ runLabelledLift $ runRandom g $ runState @Int 0 $ runPeerWithDriver sellerDriver sellerPeer
-
-    killThread thid

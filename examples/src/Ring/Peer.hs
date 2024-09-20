@@ -17,7 +17,7 @@ import GHC.Base (Any)
 import Ring.Protocol
 import Ring.Type
 import TypedSession.Core
-import TypedSession.Driver (localDriverSimple, runPeerWithDriver)
+import TypedSession.Driver (SomeRole (..), localDriverSimple, runPeerWithDriver)
 
 choice :: Int -> ChoiceNAFun IO
 choice i =
@@ -71,8 +71,8 @@ main = do
     tvar <- newTVarIO IntMap.empty
     pure (fromEnum r, tvar)
   let allMap = IntMap.fromList vs
-      driver r = localDriverSimple (\v -> putStrLn (show r <> ": " <> show v)) allMap (allMap IntMap.! (fromEnum r)) id
-  forkIO $ void $ runPeerWithDriver (driver B) bPeer
-  forkIO $ void $ runPeerWithDriver (driver C) cPeer
-  forkIO $ void $ runPeerWithDriver (driver D) dPeer
-  void $ runPeerWithDriver (driver A) (aPeer 0)
+      driver someRole = localDriverSimple (\v -> putStrLn (show v)) allMap someRole id
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SB) bPeer
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SC) cPeer
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SD) dPeer
+  void $ runPeerWithDriver (driver $ SomeRole SA) (aPeer 0)

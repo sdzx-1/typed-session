@@ -107,8 +107,8 @@ main = do
     tvar <- newTVarIO IntMap.empty
     pure (fromEnum r, tvar)
   let allMap = IntMap.fromList vs
-      driver r = localDriverSimple (\_ -> pure ()) allMap (allMap IntMap.! (fromEnum r)) id
-  forkIO $ void $ runPeerWithDriver (driver Coordinator) coordinatorPeer
-  forkIO $ void $ runPeerWithDriver (driver Alice) (alicePeer 0)
-  forkIO $ void $ runPeerWithDriver (driver Bob) (bobPeer 0)
-  void $ runPeerWithDriver (driver Client) clientPeer
+      driver r = localDriverSimple (\v -> putStrLn (show v)) allMap r id
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SCoordinator) coordinatorPeer
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SAlice) (alicePeer 0)
+  forkIO $ void $ runPeerWithDriver (driver $ SomeRole SBob) (bobPeer 0)
+  void $ runPeerWithDriver (driver $ SomeRole SClient) clientPeer
