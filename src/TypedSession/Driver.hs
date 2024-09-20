@@ -25,8 +25,6 @@ Some explanations for this diagram:
 
 3. Each role has one or more decode threads, and the decoded Msgs are placed in the MsgCache.
 
-4. SendMap aggregates the send functions of multiple Channels together.
-When sending a message, the send function of the receiver is searched from SendMap.
 -}
 module TypedSession.Driver where
 
@@ -134,12 +132,13 @@ data SomeRole role' = forall (r :: role'). (SingToInt role') => SomeRole (Sing r
 
 {- |
 
-Build Driver through SendMap and MsgCache.
+Build Driver through ConnChannels.
 Here we need some help from other functions:
 
 1. `Tracer role' ps n` is similar to the log function, used to print received or sent messages.
 2. `Encode role' ps` bytes encoding function, converts Msg into bytes.
-3. `forall a. n a -> m a` This is a bit complicated, I will explain it in detail below.
+3. `Decode role' ps failure bytes` bytes decode function, converts bytes into Msg.
+4. `forall a. n a -> m a` This is a bit complicated, I will explain it in detail below.
 
 I see Peer as three layers:
 
