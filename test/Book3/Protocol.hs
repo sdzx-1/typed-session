@@ -112,18 +112,3 @@ instance Show (AnyMsg BookRole Book) where
     TwoSuccess d -> "TwoSuccess " <> show d
     TwoNotBuy1 -> "TwoNotBuy1"
     TwoFailed -> "TwoFailed"
-
-type Start s = Maybe s
-type Start1  = Int
-
-$( do 
- x <- reify ''Start 
- y <- reify ''Start1
- runIO $ do 
-  putStrLn "--------------------------------------------"
-  putStrLn $ show x
-  putStrLn $ show y
-  putStrLn "--------------------------------------------"
- pure []
-
-  )

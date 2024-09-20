@@ -19,16 +19,11 @@ module Book3.Peer where
 
 import Book3.Protocol
 import Book3.Type
-import Control.Algebra (Has, (:+:))
-import Control.Carrier.Error.Either (runError)
 import Control.Carrier.Lift
 import Control.Carrier.Random.Gen
 import Control.Carrier.State.Strict (runState)
-import Control.Effect.Error
-import Control.Effect.Random (Random, uniform)
 import Control.Effect.State
 import Control.Monad
-import Control.Monad.IO.Class
 import Data.IFunctor (At (..), SingI (..), returnAt)
 import qualified Data.IFunctor as I
 import Data.IntMap (IntMap)
@@ -150,51 +145,51 @@ sellerPeer = I.do
         TwoAccept -> yield (TwoDate 100)
         TwoNotBuy1 -> returnAt ()
 
-data AnyPeer role' ps m where
-  AnyPeer :: Peer role' ps r m (At () (Done r)) st -> AnyPeer role' ps m
+-- data AnyPeer role' ps m where
+--   AnyPeer :: Peer role' ps r m (At () (Done r)) st -> AnyPeer role' ps m
 
-runAnyPeers
-  :: forall n role' ps sig m
-   . ( SingToInt role'
-     , Has (State (IntMap (AnyPeer role' ps n))) sig m
-     )
-  => (forall a. n a -> m a) -> m ()
-runAnyPeers liftFun = do
-  im <- get @(IntMap (AnyPeer role' ps n))
-  case IntMap.keys im of
-    [] -> pure ()
-    keys -> do
-      forM_ keys $ \key -> do
-        gets @(IntMap (AnyPeer role' ps n)) (IntMap.lookup key) >>= \case
-          Nothing -> error "np"
-          Just (AnyPeer peer) -> case peer of
-            IReturn (At ()) -> do
-              modify @(IntMap (AnyPeer role' ps n)) (IntMap.delete key)
-            LiftM fm -> do
-              np <- liftFun fm
-              modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert key (AnyPeer np))
-            Yield (msg :: Msg role' ps st send sps recv rps) cont -> do
-              let recvKey = (singToInt $ sing @recv)
-              gets @(IntMap (AnyPeer role' ps n)) (IntMap.lookup recvKey) >>= \case
-                Nothing -> error "np"
-                Just (AnyPeer recvPeer) -> case recvPeer of
-                  Await scont -> do
-                    let nS = scont (unsafeCoerce msg)
-                    modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert recvKey (AnyPeer nS))
-                  _ -> error "np"
-              modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert key (AnyPeer cont))
-            Await{} -> pure ()
-      runAnyPeers @n @role' @ps liftFun
+-- runAnyPeers
+--   :: forall n role' ps sig m
+--    . ( SingToInt role'
+--      , Has (State (IntMap (AnyPeer role' ps n))) sig m
+--      )
+--   => (forall a. n a -> m a) -> m ()
+-- runAnyPeers liftFun = do
+--   im <- get @(IntMap (AnyPeer role' ps n))
+--   case IntMap.keys im of
+--     [] -> pure ()
+--     keys -> do
+--       forM_ keys $ \key -> do
+--         gets @(IntMap (AnyPeer role' ps n)) (IntMap.lookup key) >>= \case
+--           Nothing -> error "np"
+--           Just (AnyPeer peer) -> case peer of
+--             IReturn (At ()) -> do
+--               modify @(IntMap (AnyPeer role' ps n)) (IntMap.delete key)
+--             LiftM fm -> do
+--               np <- liftFun fm
+--               modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert key (AnyPeer np))
+--             Yield (msg :: Msg role' ps st send sps recv rps) cont -> do
+--               let recvKey = (singToInt $ sing @recv)
+--               gets @(IntMap (AnyPeer role' ps n)) (IntMap.lookup recvKey) >>= \case
+--                 Nothing -> error "np"
+--                 Just (AnyPeer recvPeer) -> case recvPeer of
+--                   Await scont -> do
+--                     let nS = scont (unsafeCoerce msg)
+--                     modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert recvKey (AnyPeer nS))
+--                   _ -> error "np"
+--               modify @(IntMap (AnyPeer role' ps n)) (IntMap.insert key (AnyPeer cont))
+--             Await{} -> pure ()
+--       runAnyPeers @n @role' @ps liftFun
 
-runAP = do
-  i <- randomIO @Int
-  runRandom (mkStdGen i)
-    $ runM @(RandomC StdGen IO)
-    $ runState
-      ( IntMap.fromList
-          [ (singToInt SBuyer, AnyPeer (buyerPeer @_ @(RandomC StdGen IO) I.>> returnAt ()))
-          , (singToInt SBuyer2, AnyPeer (buyer2Peer @_ @(RandomC StdGen IO) I.>> returnAt ()))
-          , (singToInt SSeller, AnyPeer (sellerPeer @_ @(RandomC StdGen IO) I.>> returnAt ()))
-          ]
-      )
-    $ (runAnyPeers @(RandomC StdGen IO) @BookRole @Book sendM)
+-- runAP = do
+--   i <- randomIO @Int
+--   runRandom (mkStdGen i)
+--     $ runM @(RandomC StdGen IO)
+--     $ runState
+--       ( IntMap.fromList
+--           [ (singToInt SBuyer, AnyPeer (buyerPeer @_ @(RandomC StdGen IO) I.>> returnAt ()))
+--           , (singToInt SBuyer2, AnyPeer (buyer2Peer @_ @(RandomC StdGen IO) I.>> returnAt ()))
+--           , (singToInt SSeller, AnyPeer (sellerPeer @_ @(RandomC StdGen IO) I.>> returnAt ()))
+--           ]
+--       )
+--     $ (runAnyPeers @(RandomC StdGen IO) @BookRole @Book sendM)

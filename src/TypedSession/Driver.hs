@@ -31,8 +31,11 @@ When sending a message, the send function of the receiver is searched from SendM
 module TypedSession.Driver where
 
 import Control.Concurrent.Class.MonadSTM
+import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadThrow (MonadThrow, throwIO)
 import Control.Monad.Class.MonadTimer (MonadDelay, threadDelay)
+import Data.Data (Typeable)
+import Data.Foldable (for_)
 import Data.IFunctor (At (..), Sing, SingI (sing))
 import qualified Data.IFunctor as I
 import Data.IntMap (IntMap)
@@ -115,10 +118,16 @@ nullTracer :: (Monad m) => a -> m ()
 nullTracer _ = pure ()
 
 {- |
-SendMap aggregates the send functions of multiple Channels together.
-When sending a message, the send function of the receiver is found from SendMap.
+ConnChannels aggregates the multiple connect channels together.
 -}
-type SendMap role' m bytes = IntMap (bytes -> m ())
+type ConnChannels role' m bytes = [(SomeRole role', Channel m bytes)]
+
+data NotConnect role' = NotConnect role' role'
+  deriving (Show)
+
+instance (Show role', Typeable role') => Exception (NotConnect role')
+
+data SomeRole role' = forall (r :: role'). (SingToInt role') => SomeRole (Sing r)
 
 {- |
 
@@ -136,106 +145,75 @@ I see Peer as three layers:
 3. `n` bottom layer, responsible for receiving and sending bytes. It can have multiple options such as IO or IOSim. Using IOSim can easily test the code.
 -}
 driverSimple
-  :: forall role' ps bytes m n
+  :: forall role' ps failure bytes m n
    . ( Monad m
      , Monad n
      , MonadSTM n
+     , MonadFork n
+     , MonadDelay n
+     , MonadThrow n
+     , SingToInt role'
+     , Enum role'
+     , Show role'
+     , Typeable role'
+     , Exception failure
      )
   => Tracer role' ps n
   -> Encode role' ps bytes
-  -> SendMap role' n bytes
-  -> MsgCache role' ps n
+  -> Decode role' ps failure bytes
+  -> ConnChannels role' n bytes
   -> (forall a. n a -> m a)
-  -> Driver role' ps m
-driverSimple tracer Encode{encode} sendMap msgCache liftFun =
-  Driver{sendMsg, recvMsg}
- where
-  sendMsg
-    :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
-     . ( SingI recv
-       , SingI from
-       , SingToInt ps
-       , SingToInt role'
-       )
-    => Sing recv
-    -> Msg role' ps from send st recv st1
-    -> m ()
-  sendMsg role msg = liftFun $ do
-    case IntMap.lookup (singToInt role) sendMap of
-      Nothing -> error "np"
-      Just sendFun -> sendFun (encode msg)
-    tracer (TraceSendMsg (AnyMsg msg))
+  -> n (Driver role' ps m)
+driverSimple
+  tracer
+  Encode{encode}
+  decodeV
+  connChannels
+  liftFun = do
+    msgCache <- newTVarIO IntMap.empty
+    for_ connChannels $ \(_, channel) -> forkIO $ decodeLoop Nothing decodeV channel msgCache
+    pure $ Driver{sendMsg, recvMsg = recvMsg' msgCache}
+   where
+    sendMap = IntMap.fromList $ fmap (\(SomeRole r, c) -> (singToInt r, send c)) connChannels
+    sendMsg
+      :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
+       . ( SingI recv
+         , SingI from
+         , SingToInt ps
+         , SingToInt role'
+         )
+      => Sing recv
+      -> Msg role' ps from send st recv st1
+      -> m ()
+    sendMsg role msg = liftFun $ do
+      let sendKey = singToInt (sing @from)
+          recvKey = singToInt role
+      case IntMap.lookup recvKey sendMap of
+        Nothing -> do
+          let sendRole = toEnum @role' sendKey
+              recvRole = toEnum @role' recvKey
+          throwIO (NotConnect sendRole recvRole)
+        Just sendFun -> sendFun (encode msg)
+      tracer (TraceSendMsg (AnyMsg msg))
 
-  recvMsg
-    :: forall (st' :: ps)
-     . (SingToInt ps)
-    => Sing st'
-    -> m (AnyMsg role' ps)
-  recvMsg sst' = do
-    let singInt = singToInt sst'
-    liftFun $ do
-      anyMsg <- atomically $ do
-        agencyMsg <- readTVar msgCache
-        case IntMap.lookup singInt agencyMsg of
-          Nothing -> retry
-          Just v -> do
-            writeTVar msgCache (IntMap.delete singInt agencyMsg)
-            pure v
-      tracer (TraceRecvMsg (anyMsg))
-      pure anyMsg
-
-localDriverSimple
-  :: forall role' ps m n
-   . ( Monad m
-     , Monad n
-     , MonadSTM n
-     )
-  => Tracer role' ps n
-  -> IntMap (MsgCache role' ps n)
-  -> MsgCache role' ps n
-  -> (forall a. n a -> m a)
-  -> Driver role' ps m
-localDriverSimple tracer allMsgCache msgCache liftFun =
-  Driver{sendMsg, recvMsg}
- where
-  sendMsg
-    :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
-     . ( SingI recv
-       , SingI from
-       , SingToInt ps
-       , SingToInt role'
-       )
-    => Sing recv
-    -> Msg role' ps from send st recv st1
-    -> m ()
-  sendMsg role msg = liftFun $ do
-    case IntMap.lookup (singToInt role) allMsgCache of
-      Nothing -> error "np"
-      Just ttvar -> atomically $ do
-        agencyMsg <- readTVar ttvar
-        let singInt = singToInt (sing @from)
-        case IntMap.lookup singInt agencyMsg of
-          Nothing -> writeTVar ttvar (IntMap.insert singInt (AnyMsg msg) agencyMsg)
-          Just _v -> retry
-    tracer (TraceSendMsg (AnyMsg msg))
-
-  recvMsg
-    :: forall (st' :: ps)
-     . (SingToInt ps)
-    => Sing st'
-    -> m (AnyMsg role' ps)
-  recvMsg sst' = do
-    let singInt = singToInt sst'
-    liftFun $ do
-      anyMsg <- atomically $ do
-        agencyMsg <- readTVar msgCache
-        case IntMap.lookup singInt agencyMsg of
-          Nothing -> retry
-          Just v -> do
-            writeTVar msgCache (IntMap.delete singInt agencyMsg)
-            pure v
-      tracer (TraceRecvMsg (anyMsg))
-      pure anyMsg
+    recvMsg'
+      :: forall (st' :: ps)
+       . (SingToInt ps)
+      => MsgCache role' ps n
+      -> Sing st'
+      -> m (AnyMsg role' ps)
+    recvMsg' msgCache sst' = do
+      let singInt = singToInt sst'
+      liftFun $ do
+        anyMsg <- atomically $ do
+          agencyMsg <- readTVar msgCache
+          case IntMap.lookup singInt agencyMsg of
+            Nothing -> retry
+            Just v -> do
+              writeTVar msgCache (IntMap.delete singInt agencyMsg)
+              pure v
+        tracer (TraceRecvMsg (anyMsg))
+        pure anyMsg
 
 {- |
 decode loop, usually in a separate thread.
@@ -252,13 +230,12 @@ This usually happens when the efficiency of Msg generation is greater than the e
 -}
 decodeLoop
   :: (Exception failure, MonadDelay n, MonadSTM n, MonadThrow n)
-  => Tracer role' ps n
-  -> Maybe bytes
+  => Maybe bytes
   -> Decode role' ps failure bytes
   -> Channel n bytes
   -> MsgCache role' ps n
   -> n ()
-decodeLoop tracer mbt d@Decode{decode} channel tvar = do
+decodeLoop mbt d@Decode{decode} channel tvar = do
   result <- runDecoderWithChannel channel mbt decode
   case result of
     Right (AnyMsg msg, mbt') -> do
@@ -268,7 +245,70 @@ decodeLoop tracer mbt d@Decode{decode} channel tvar = do
         case IntMap.lookup agencyInt agencyMsg of
           Nothing -> writeTVar tvar (IntMap.insert agencyInt (AnyMsg msg) agencyMsg)
           Just _v -> retry
-      decodeLoop tracer mbt' d channel tvar
+      decodeLoop mbt' d channel tvar
     Left failure -> do
       threadDelay 1_000_000
       throwIO failure
+
+localDriverSimple
+  :: forall role' ps m n
+   . ( Monad m
+     , Monad n
+     , MonadSTM n
+     , Enum role'
+     , MonadThrow n
+     , Show role'
+     , Typeable role'
+     )
+  => Tracer role' ps n
+  -> IntMap (MsgCache role' ps n)
+  -> SomeRole role'
+  -> (forall a. n a -> m a)
+  -> Driver role' ps m
+localDriverSimple tracer allMsgCache (SomeRole r) liftFun =
+  Driver{sendMsg, recvMsg = recvMsg' (allMsgCache IntMap.! (singToInt r))}
+ where
+  sendMsg
+    :: forall (send :: role') (recv :: role') (from :: ps) (st :: ps) (st1 :: ps)
+     . ( SingI recv
+       , SingI from
+       , SingToInt ps
+       , SingToInt role'
+       )
+    => Sing recv
+    -> Msg role' ps from send st recv st1
+    -> m ()
+  sendMsg role msg = liftFun $ do
+    let sendKey = singToInt (sing @from)
+        recvKey = singToInt role
+    case IntMap.lookup (singToInt role) allMsgCache of
+      Nothing -> do
+        let sendRole = toEnum @role' sendKey
+            recvRole = toEnum @role' recvKey
+        throwIO (NotConnect sendRole recvRole)
+      Just ttvar -> atomically $ do
+        agencyMsg <- readTVar ttvar
+        let singInt = singToInt (sing @from)
+        case IntMap.lookup singInt agencyMsg of
+          Nothing -> writeTVar ttvar (IntMap.insert singInt (AnyMsg msg) agencyMsg)
+          Just _v -> retry
+    tracer (TraceSendMsg (AnyMsg msg))
+
+  recvMsg'
+    :: forall (st' :: ps)
+     . (SingToInt ps)
+    => MsgCache role' ps n
+    -> Sing st'
+    -> m (AnyMsg role' ps)
+  recvMsg' msgCache sst' = do
+    let singInt = singToInt sst'
+    liftFun $ do
+      anyMsg <- atomically $ do
+        agencyMsg <- readTVar msgCache
+        case IntMap.lookup singInt agencyMsg of
+          Nothing -> retry
+          Just v -> do
+            writeTVar msgCache (IntMap.delete singInt agencyMsg)
+            pure v
+      tracer (TraceRecvMsg (anyMsg))
+      pure anyMsg
