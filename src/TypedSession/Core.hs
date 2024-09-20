@@ -14,6 +14,7 @@
 
 module TypedSession.Core where
 
+import Control.Concurrent.Class.MonadSTM (MonadSTM (..))
 import Data.IFunctor
 import Data.IntMap (IntMap)
 import Data.Kind
@@ -125,7 +126,7 @@ class (SingToInt role', SingToInt ps) => Protocol role' ps where
 Messages received from the outside are placed in MsgCache. When interpreting
 Peer will use the Msg in MsgCache.
 -}
-type MsgCache role' ps = IntMap (AnyMsg role' ps)
+type MsgCache role' ps n = TVar n (IntMap (AnyMsg role' ps))
 
 {- |
 Packaging of Msg, shielding part of the type information, mainly used for serialization.

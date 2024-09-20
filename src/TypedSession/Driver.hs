@@ -144,10 +144,10 @@ driverSimple
   => Tracer role' ps n
   -> Encode role' ps bytes
   -> SendMap role' n bytes
-  -> TVar n (MsgCache role' ps)
+  -> MsgCache role' ps n
   -> (forall a. n a -> m a)
   -> Driver role' ps m
-driverSimple tracer Encode{encode} sendMap tvar liftFun =
+driverSimple tracer Encode{encode} sendMap msgCache liftFun =
   Driver{sendMsg, recvMsg}
  where
   sendMsg
@@ -175,11 +175,11 @@ driverSimple tracer Encode{encode} sendMap tvar liftFun =
     let singInt = singToInt sst'
     liftFun $ do
       anyMsg <- atomically $ do
-        agencyMsg <- readTVar tvar
+        agencyMsg <- readTVar msgCache
         case IntMap.lookup singInt agencyMsg of
           Nothing -> retry
           Just v -> do
-            writeTVar tvar (IntMap.delete singInt agencyMsg)
+            writeTVar msgCache (IntMap.delete singInt agencyMsg)
             pure v
       tracer (TraceRecvMsg (anyMsg))
       pure anyMsg
@@ -191,11 +191,11 @@ localDriverSimple
      , MonadSTM n
      )
   => Tracer role' ps n
-  -> IntMap (TVar n (MsgCache role' ps))
-  -> TVar n (MsgCache role' ps)
+  -> IntMap (MsgCache role' ps n)
+  -> MsgCache role' ps n
   -> (forall a. n a -> m a)
   -> Driver role' ps m
-localDriverSimple tracer allTVar tvar liftFun =
+localDriverSimple tracer allMsgCache msgCache liftFun =
   Driver{sendMsg, recvMsg}
  where
   sendMsg
@@ -209,7 +209,7 @@ localDriverSimple tracer allTVar tvar liftFun =
     -> Msg role' ps from send st recv st1
     -> m ()
   sendMsg role msg = liftFun $ do
-    case IntMap.lookup (singToInt role) allTVar of
+    case IntMap.lookup (singToInt role) allMsgCache of
       Nothing -> error "np"
       Just ttvar -> atomically $ do
         agencyMsg <- readTVar ttvar
@@ -228,11 +228,11 @@ localDriverSimple tracer allTVar tvar liftFun =
     let singInt = singToInt sst'
     liftFun $ do
       anyMsg <- atomically $ do
-        agencyMsg <- readTVar tvar
+        agencyMsg <- readTVar msgCache
         case IntMap.lookup singInt agencyMsg of
           Nothing -> retry
           Just v -> do
-            writeTVar tvar (IntMap.delete singInt agencyMsg)
+            writeTVar msgCache (IntMap.delete singInt agencyMsg)
             pure v
       tracer (TraceRecvMsg (anyMsg))
       pure anyMsg
@@ -256,7 +256,7 @@ decodeLoop
   -> Maybe bytes
   -> Decode role' ps failure bytes
   -> Channel n bytes
-  -> TVar n (MsgCache role' ps)
+  -> MsgCache role' ps n
   -> n ()
 decodeLoop tracer mbt d@Decode{decode} channel tvar = do
   result <- runDecoderWithChannel channel mbt decode
