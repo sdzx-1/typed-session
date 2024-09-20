@@ -125,7 +125,7 @@ ConnChannels aggregates the multiple connect channels together.
 -}
 type ConnChannels role' m bytes = [(SomeRole role', Channel m bytes)]
 
-data NotConnect role' = NotConnect role' role'
+data NotConnect role' = NotConnect role'
   deriving (Show)
 
 instance (Show role', Typeable role') => Exception (NotConnect role')
@@ -190,13 +190,11 @@ driverSimple
       -> Msg role' ps from send st recv st1
       -> m ()
     sendMsg role msg = liftFun $ do
-      let sendKey = singToInt (sing @from)
-          recvKey = singToInt role
+      let recvKey = singToInt role
       case IntMap.lookup recvKey sendMap of
         Nothing -> do
-          let sendRole = toEnum @role' sendKey
-              recvRole = toEnum @role' recvKey
-          throwIO (NotConnect sendRole recvRole)
+          let recvRole = toEnum @role' recvKey
+          throwIO (NotConnect recvRole)
         Just sendFun -> sendFun (encode msg)
       tracer (TraceSendMsg (AnyMsg msg))
 
@@ -283,13 +281,11 @@ localDriverSimple tracer allMsgCache (SomeRole r) liftFun =
     -> Msg role' ps from send st recv st1
     -> m ()
   sendMsg role msg = liftFun $ do
-    let sendKey = singToInt (sing @from)
-        recvKey = singToInt role
+    let recvKey = singToInt role
     case IntMap.lookup (singToInt role) allMsgCache of
       Nothing -> do
-        let sendRole = toEnum @role' sendKey
-            recvRole = toEnum @role' recvKey
-        throwIO (NotConnect sendRole recvRole)
+        let recvRole = toEnum @role' recvKey
+        throwIO (NotConnect recvRole)
       Just ttvar -> atomically $ do
         agencyMsg <- readTVar ttvar
         let singInt = singToInt (sing @from)
