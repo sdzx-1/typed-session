@@ -78,7 +78,7 @@ roleDecs name = do
     _ -> error $ "Name: " ++ show name ++ " is not a data constructor"
 
 protDecsAndMsgDecs :: forall r bst. (Show r, Show bst, Enum r, Bounded r) => String -> Name -> Name -> PipeResult r bst -> Q [Dec]
-protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBound = (fromVal, toVal), branchResultTypeInfo, branchFunList, allMsgBATypes} = do
+protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stList, branchResultTypeInfo, branchFunList, allMsgBATypes} = do
   let protName = mkName protN
       protSName = mkName ("S" <> protN)
       mkSiName i = mkName $ "S" <> show i
@@ -94,7 +94,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
                   [(Bang NoSourceUnpackedness NoSourceStrictness, ConT bstName)]
               else NormalC (mkSiName i) []
       -- generate protocol data type
-      dataProt = [DataD [] protName [] Nothing [genConstr i | i <- [fromVal .. toVal]] []]
+      dataProt = [DataD [] protName [] Nothing [genConstr i | i <- stList] []]
 
   let tAnyToType :: Name -> T bst -> TH.Type
       tAnyToType s = \case
@@ -138,7 +138,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
               else
                 GadtC [mkSSiName i] [] (AppT (ConT protSName) (PromotedT $ mkSiName i))
       -- generate protocol singleton data type
-      dataSingletonProt = [DataD [] protSName [KindedTV aVar BndrReq (ConT protName)] Nothing [genSConstr i | i <- [fromVal .. toVal]] []]
+      dataSingletonProt = [DataD [] protSName [KindedTV aVar BndrReq (ConT protName)] Nothing [genSConstr i | i <- stList] []]
 
   -- generate type family Sing to Singleton protocol
   let singSingletonProt = [TySynInstD (TySynEqn Nothing (ConT ''Sing) (ConT protSName))]
@@ -219,7 +219,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
                 )
             )
             [FunD 'sing [Clause [] (NormalB (ConE (mkName $ "S" <> (if i == -1 then "End" else ("S" <> show i))))) []]]
-        | i <- [fromVal .. toVal]
+        | i <- stList
         ]
 
   xVar <- newName "x"
