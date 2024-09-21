@@ -67,7 +67,7 @@ class SingToInt s where
 Describes the type class of Msg. The core of typed-session.
 
 @
-type Done (sr :: role') :: ps
+type Done :: ps
 @
 
 Describe the state of each role when it terminates.
@@ -111,7 +111,7 @@ s2   s4   s5
 @
 -}
 class (SingToInt role', SingToInt ps) => Protocol role' ps where
-  type Done (sr :: role') :: ps
+  type Done :: ps
   data
     Msg
       role'

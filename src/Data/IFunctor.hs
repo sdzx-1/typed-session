@@ -37,7 +37,7 @@ Please note the following example:
 
 @
 serverPeer ::
-  (Monad m) => Peer Role PingPong Server m (At () (Done Server)) (S0 s)
+  (Monad m) => Peer Role PingPong Server m (At () Done) (S0 s)
 serverPeer = I.do
   -- The server is in a state (S0 s) while it is awaiting a message,
   -- and its state is indeterminate until it receives a message.

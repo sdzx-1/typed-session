@@ -24,7 +24,6 @@ Some explanations for this diagram:
 2. Each role has a Peer thread, in which the Peer runs.
 
 3. Each role has one or more decode threads, and the decoded Msgs are placed in the MsgCache.
-
 -}
 module TypedSession.Driver where
 
@@ -76,7 +75,7 @@ runPeerWithDriver
      , (SingToInt role')
      )
   => Driver role' ps m
-  -> Peer role' ps r m (At a (Done r)) st
+  -> Peer role' ps r m (At a Done) st
   -> m a
 runPeerWithDriver Driver{sendMsg, recvMsg, terminalDecodeThreads} peer = do
   a <- go peer
@@ -85,7 +84,7 @@ runPeerWithDriver Driver{sendMsg, recvMsg, terminalDecodeThreads} peer = do
  where
   go
     :: forall st'
-     . Peer role' ps r m (At a (Done r)) st'
+     . Peer role' ps r m (At a Done) st'
     -> m a
   go (IReturn (At a)) = pure a
   go (LiftM k) = k >>= go

@@ -234,19 +234,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stList
         ]
 
   -- make instance type family Done
-  roleRes <- reify roleName
-  instDoneDesc <- case roleRes of
-    TyConI (DataD [] _ [] Nothing cons _) -> do
-      pure
-        [ TySynInstD
-            ( TySynEqn
-                Nothing
-                (AppT (ConT (mkName "Done")) (PromotedT n))
-                (PromotedT (mkName "End"))
-            )
-        | NormalC n [] <- cons
-        ]
-    _ -> error $ "Name: " ++ show roleName ++ " is not a data constructor"
+  let instDoneDesc = [TySynInstD (TySynEqn Nothing (ConT (mkName "Done")) (PromotedT (mkName "End")))]
 
   let mkDataInstanceMsg :: Name -> Protocol (MsgT1 r bst) r bst -> Q [Con]
       mkDataInstanceMsg s = \case

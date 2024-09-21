@@ -30,7 +30,7 @@ choice = I.do
     RPut k v -> liftConstructor (BranchSt_Put k v)
     RGet k -> liftConstructor (BranchSt_Get k)
 
-clientPeer :: Peer KVRole KV Client IO (At () (Done Client)) ClientStartSt
+clientPeer :: Peer KVRole KV Client IO (At () Done) ClientStartSt
 clientPeer = I.do
   choice I.>>= \case
     BranchSt_Stop -> I.do
@@ -47,7 +47,7 @@ clientPeer = I.do
 
 primaryPeer
   :: IORef (Map String String)
-  -> Peer KVRole KV Primary IO (At () (Done Primary)) (PrimaryStartSt s)
+  -> Peer KVRole KV Primary IO (At () Done) (PrimaryStartSt s)
 primaryPeer kvmapRef = I.do
   await I.>>= \case
     PStop -> returnAt ()
@@ -60,7 +60,7 @@ primaryPeer kvmapRef = I.do
       yield (GetKeyResult v)
       primaryPeer kvmapRef
 
-backupPeer :: IORef (Map String String) -> Peer KVRole KV Backup IO (At () (Done Backup)) (BackupStartSt s)
+backupPeer :: IORef (Map String String) -> Peer KVRole KV Backup IO (At () Done) (BackupStartSt s)
 backupPeer kvmapRef = I.do
   await I.>>= \case
     BStop -> returnAt ()

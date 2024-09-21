@@ -17,7 +17,6 @@ import Control.Monad.Class.MonadFork (forkIO)
 import Data.IFunctor (At (..), returnAt)
 import qualified Data.IFunctor as I
 import qualified Data.IntMap as IntMap
-import TypedSession.Codec
 import TypedSession.Core
 import TypedSession.Driver
 
@@ -31,7 +30,7 @@ choice = I.do
     st -> liftConstructor (BranchSt_Continue (parse st))
 
 clientPeer
-  :: Peer BankRole Bank Client IO (At () (Done Client)) ClientStartSt
+  :: Peer BankRole Bank Client IO (At () Done) ClientStartSt
 clientPeer = do
   choice I.>>= \case
     BranchSt_Finish -> I.do
@@ -53,7 +52,7 @@ validC ar br =
     else liftConstructor BranchSt_CFalse
 
 coordinatorPeer
-  :: Peer BankRole Bank Coordinator IO (At () (Done Coordinator)) (CoordinatorStartSt s)
+  :: Peer BankRole Bank Coordinator IO (At () Done) (CoordinatorStartSt s)
 coordinatorPeer = do
   await I.>>= \case
     CStop -> I.do
@@ -76,7 +75,7 @@ coordinatorPeer = do
           yield ValidSuccessedB
           coordinatorPeer
 
-alicePeer :: Int -> Peer BankRole Bank Alice IO (At () (Done Alice)) (AliceStartSt s)
+alicePeer :: Int -> Peer BankRole Bank Alice IO (At () Done) (AliceStartSt s)
 alicePeer val = I.do
   liftm $ putStrLn $ "alice's val: " ++ show val
   await I.>>= \case
@@ -88,7 +87,7 @@ alicePeer val = I.do
         ValidSuccessedA -> alicePeer val'
     AStop -> returnAt ()
 
-bobPeer :: Int -> Peer BankRole Bank Bob IO (At () (Done Bob)) (BobStartSt s)
+bobPeer :: Int -> Peer BankRole Bank Bob IO (At () Done) (BobStartSt s)
 bobPeer val = I.do
   liftm $ putStrLn $ "Bob's val: " ++ show val
   await I.>>= \case

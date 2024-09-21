@@ -25,7 +25,7 @@ choice i =
     then liftConstructor BranchSt_Stop
     else liftConstructor BranchSt_Continue
 
-aPeer :: Int -> Peer RingRole Ring A IO (At () (Done A)) (AStartSt)
+aPeer :: Int -> Peer RingRole Ring A IO (At () Done) (AStartSt)
 aPeer i = I.do
   choice i I.>>= \case
     BranchSt_Stop -> I.do
@@ -37,7 +37,7 @@ aPeer i = I.do
       DA <- await
       aPeer (i + 1)
 
-bPeer :: Peer RingRole Ring B IO (At () (Done B)) (BStartSt Any)
+bPeer :: Peer RingRole Ring B IO (At () Done) (BStartSt s)
 bPeer =
   await I.>>= \case
     BStop -> I.do
@@ -46,7 +46,7 @@ bPeer =
       yield BC
       bPeer
 
-cPeer :: Peer RingRole Ring C IO (At () (Done C)) (CStartSt Any)
+cPeer :: Peer RingRole Ring C IO (At () Done) (CStartSt s)
 cPeer =
   await I.>>= \case
     CStop -> I.do
@@ -55,7 +55,7 @@ cPeer =
       yield CD
       cPeer
 
-dPeer :: Peer RingRole Ring D IO (At () (Done D)) (DStartSt Any)
+dPeer :: Peer RingRole Ring D IO (At () Done) (DStartSt s)
 dPeer =
   await I.>>= \case
     DStop -> I.do
