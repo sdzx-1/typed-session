@@ -21,16 +21,9 @@ import Book3.Protocol
 import Book3.Type
 import Control.Carrier.Lift
 import Control.Carrier.Random.Gen
-import Control.Carrier.State.Strict (runState)
-import Control.Effect.State
-import Control.Monad
-import Data.IFunctor (At (..), SingI (..), returnAt)
+import Data.IFunctor (At (..), returnAt)
 import qualified Data.IFunctor as I
-import Data.IntMap (IntMap)
-import qualified Data.IntMap as IntMap
-import System.Random (StdGen, mkStdGen, randomIO)
 import TypedSession.Core
-import Unsafe.Coerce (unsafeCoerce)
 
 budget :: Int
 budget = 16

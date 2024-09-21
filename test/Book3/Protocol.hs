@@ -20,7 +20,6 @@ import Book3.Type
 
 import TypedSession.Codec
 import TypedSession.Core
-import Language.Haskell.TH
 
 
 [bookProtocol|
