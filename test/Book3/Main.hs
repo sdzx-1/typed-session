@@ -18,9 +18,9 @@ module Book3.Main where
 import Book3.Peer
 import Book3.Protocol
 import Book3.Type
+import Control.Carrier.Lift (runM, sendM)
 import Control.Carrier.Random.Gen (runRandom)
 import Control.Concurrent.Class.MonadSTM
-import Control.Effect.Labelled (runLabelledLift, sendM)
 import Control.Monad
 import Control.Monad.Class.MonadFork (MonadFork, forkIO)
 import Control.Monad.Class.MonadSay
@@ -96,16 +96,16 @@ runAll g = do
 
   -- fork seller Peer thread
   forkIO $ do
-    runLabelledLift $ runRandom g1 $ runPeerWithDriver sellerDriver sellerPeer
+    runM $ runRandom g1 $ runPeerWithDriver sellerDriver sellerPeer
     atomically $ writeTMVar resultTMVar1 ()
 
   -- fork buyer2 Peer thread
   forkIO $ do
-    runLabelledLift $ runRandom g2 $ runPeerWithDriver buyer2Driver buyer2Peer
+    runM $ runRandom g2 $ runPeerWithDriver buyer2Driver buyer2Peer
     atomically $ writeTMVar resultTMVar2 ()
 
   -- run buyer Peer
-  void $ runLabelledLift $ runRandom g3 $ runPeerWithDriver buyerDriver buyerPeer
+  void $ runM $ runRandom g3 $ runPeerWithDriver buyerDriver buyerPeer
 
   -- wait seller, buyer
   atomically $ do
