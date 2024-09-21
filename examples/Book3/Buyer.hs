@@ -9,7 +9,6 @@ import Book3.Codec
 import Book3.Peer
 import Book3.Protocol
 import Control.Carrier.Random.Gen (runRandom)
-import Control.Effect.Labelled (runLabelledLift)
 import qualified Control.Exception as E
 import Control.Monad (void)
 import Control.Monad.Class.MonadFork
@@ -18,6 +17,7 @@ import Network.Socket
 import System.Random (newStdGen)
 import TypedSession.Codec (Decode (..))
 import TypedSession.Driver
+import Control.Carrier.Lift (runM)
 
 main :: IO ()
 main = runTCPServer Nothing "3000"
@@ -61,7 +61,7 @@ runTCPServer mhost port = withSocketsDo $ do
 
     g <- newStdGen
 
-    void $ runLabelledLift $ runRandom g $ runPeerWithDriver buyerDriver buyerPeer
+    void $ runM $ runRandom g $ runPeerWithDriver buyerDriver buyerPeer
 
     close buyer2
     close seller

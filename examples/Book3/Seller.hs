@@ -11,7 +11,6 @@ import Book3.Type
 import Control.Carrier.Random.Gen (runRandom)
 import Control.Carrier.State.Strict (runState)
 import Control.Concurrent.Class.MonadSTM
-import Control.Effect.Labelled (runLabelledLift)
 import qualified Control.Exception as E
 import Control.Monad.Class.MonadFork
 import Control.Monad.IO.Class (liftIO)
@@ -26,6 +25,7 @@ import qualified TypedSession.Codec as C
 import TypedSession.Core (SingToInt (singToInt))
 import TypedSession.Driver
 import TypedSession.Driver (driverSimple)
+import Control.Carrier.Lift (runM)
 
 main :: IO ()
 main = runTCPClient "127.0.0.1" "3000"
@@ -46,4 +46,4 @@ runTCPClient host port = withSocketsDo $ do
   client sock = do
     sellerDriver <- driverSimple (myTracer "seller :") encodeMsg (Decode decodeMsg) [(SomeRole SBuyer, socketAsChannel sock)] liftIO
     g <- newStdGen
-    void $ runLabelledLift $ runRandom g $ runState @Int 0 $ runPeerWithDriver sellerDriver sellerPeer
+    void $ runM $ runRandom g $ runState @Int 0 $ runPeerWithDriver sellerDriver sellerPeer

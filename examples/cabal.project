@@ -1,7 +1,2 @@
 packages: .
         , ../typed-session.cabal
-
-source-repository-package
-  type: git
-  location: https://github.com/sdzx-1/fused-effects.git
-  tag: ac34a772f13cbba65b453c73be99201b18ac7701

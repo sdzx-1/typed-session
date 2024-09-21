@@ -11,7 +11,6 @@
 {-# LANGUAGE TypeApplications #-}
 {-# LANGUAGE TypeFamilies #-}
 {-# OPTIONS_GHC -Wno-orphans #-}
-{-# OPTIONS_GHC -ddump-splices #-}
 {-# OPTIONS_GHC -Wno-unused-do-bind #-}
 
 module Book3.Protocol where

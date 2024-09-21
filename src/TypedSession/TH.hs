@@ -14,9 +14,9 @@
 {-# OPTIONS_GHC -Wno-unused-imports #-}
 {-# OPTIONS_GHC -split-sections #-}
 
-module TypedSession.TH where
+module TypedSession.TH (protocol, protocol') where
 
-import Control.Monad (forM)
+import Control.Monad (forM, when)
 import Data.Either (fromRight)
 import Data.IFunctor (Sing, SingI (..))
 import Data.Kind
@@ -333,7 +333,7 @@ protDecsAndMsgDecs protN roleName bstName PipeResult{msgT, msgT1, dnySet, stBoun
       ++ instanceSingToInt
       ++ instanceMsg
 
-protocol
+protocol'
   :: forall r bst
    . ( Enum r
      , Bounded r
@@ -343,8 +343,8 @@ protocol
      , Show bst
      , Ord r
      )
-  => String -> Name -> Name -> QuasiQuoter
-protocol protN roleName bstName =
+  => String -> Name -> Name -> Bool -> QuasiQuoter
+protocol' protN roleName bstName b =
   QuasiQuoter
     { quoteExp = const $ fail "No protocol parse for exp"
     , quotePat = const $ fail "No protocol parse for pat"
@@ -359,9 +359,23 @@ protocol protN roleName bstName =
       Left e -> fail (show e)
       Right pipResult -> do
         let graphStr = genGraph @r @bst pipResult
-        runIO $ do
+        when b $ runIO $ do
           writeFile (protN <> ".prot") graphStr
           putStrLn graphStr
         d1 <- roleDecs roleName
         d2 <- protDecsAndMsgDecs protN roleName bstName pipResult
         pure (d1 ++ d2)
+
+protocol
+  :: forall r bst
+   . ( Enum r
+     , Bounded r
+     , Show r
+     , Enum bst
+     , Bounded bst
+     , Show bst
+     , Ord r
+     )
+  => String -> Name -> Name -> QuasiQuoter
+protocol protN roleName bstName =
+  protocol' @r @bst protN roleName bstName False
