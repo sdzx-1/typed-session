@@ -1,6 +1,6 @@
 # typed-session
 
-![img](https://picx.zhimg.com/v2-7833838811b6a8f15550091e2af40301_b.webp)
+![img](data/example.gif)
 
 
 Typed session are used to ensure desirable properties in concurrent and distributed systems, i.e. absence of communication errors or deadlocks, and protocol conformance.
